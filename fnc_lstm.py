@@ -159,15 +159,14 @@ ITERATIONS_PER_EPOCH = 100
 # BATCH_SIZE = 16
 
 # valid_x, valid_y = generate_batch(num_bits=NUM_BITS, batch_size=100)
-# TODO replace above line with:
-# 	(1) split data into train test
-#		(2) figure out which data is train and test
-# 	(3) split train into batches
+
+# acquire data from files
 d = DataSet()
 folds, hold_out = kfold_split(d, n_folds=10)
 fold_stances, hold_out_stances = get_stances_for_folds(d, folds, hold_out)
 
-
+# TODO generate feature vectors for files
+#
 
 session = tf.Session()
 # For some reason it is our job to do this:
@@ -179,7 +178,7 @@ for epoch in range(1000):
         # here train_fn is what triggers backprop. error and accuracy on their
         # own do not trigger the backprop.
         # x, y = generate_batch(num_bits=NUM_BITS, batch_size=BATCH_SIZE)
-        # TODO replace above line with getting the current batch
+        # TODO replace above line with getting feature vectors for current batch
 
 				
 				epoch_error += session.run([error, train_fn], {

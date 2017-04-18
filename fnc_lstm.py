@@ -24,7 +24,29 @@ import tensorflow as tf
 import tensorflow.contrib.layers as layers
 from fnc_1_baseline_master.utils.dataset import DataSet
 from fnc_1_baseline_master.utils.generate_test_splits import kfold_split, get_stances_for_folds
-from fnc_1_baseline_master.fnc_kfold import generate_features
+# from fnc_1_baseline_master.fnc_kfold import generate_features
+from fnc_1_baseline_master.feature_engineering import refuting_features, polarity_features, hand_features, gen_or_load_feats
+from fnc_1_baseline_master.feature_engineering import word_overlap_features
+from fnc_1_baseline_master.utils.score import report_score, LABELS, score_submission
+
+from fnc_1_baseline_master.utils.system import parse_params, check_version
+
+
+def generate_features(stances,dataset,name):
+    h, b, y = [],[],[]
+
+    for stance in stances:
+        y.append(LABELS.index(stance['Stance']))
+        h.append(stance['Headline'])
+        b.append(dataset.articles[stance['Body ID']])
+
+    X_overlap = gen_or_load_feats(word_overlap_features, h, b, "fnc_1_baseline_master/features/overlap."+name+".npy")
+    X_refuting = gen_or_load_feats(refuting_features, h, b, "fnc_1_baseline_master/features/refuting."+name+".npy")
+    X_polarity = gen_or_load_feats(polarity_features, h, b, "fnc_1_baseline_master/features/polarity."+name+".npy")
+    X_hand = gen_or_load_feats(hand_features, h, b, "fnc_1_baseline_master/features/hand."+name+".npy")
+
+    X = np.c_[X_hand, X_polarity, X_refuting, X_overlap]
+    return X,y
 
 map_fn = tf.map_fn #.python.functional_ops.map_fn
 
@@ -38,7 +60,7 @@ OUTPUT_SIZE   = 1       # 1 bit per timestep
 TINY          = 1e-6    # to avoid NaNs in logs
 LEARNING_RATE = 0.01
 
-USE_LSTM = True
+USE_LSTM = False
 
 inputs  = tf.placeholder(tf.float32, (None, None, INPUT_SIZE))  # (time, batch, in)
 outputs = tf.placeholder(tf.float32, (None, None, OUTPUT_SIZE)) # (time, batch, out)
@@ -57,7 +79,7 @@ outputs = tf.placeholder(tf.float32, (None, None, OUTPUT_SIZE)) # (time, batch, 
 # Example LSTM cell with learnable zero_state can be found here:
 #    https://gist.github.com/nivwusquorum/160d5cf7e1e82c21fad3ebf04f039317
 if USE_LSTM:
-    cell = tf.contrib.rnn.BasicLSTMCell(RNN_HIDDEN, state_is_tuple=True)
+    cell = tf.contrib.rnn.LSTMCell #tf.contrib.rnn.BasicLSTMCell(RNN_HIDDEN, state_is_tuple=True)
 else:
     cell = tf.nn.rnn_cell.BasicRNNCell(RNN_HIDDEN)
 
@@ -91,6 +113,7 @@ train_fn = tf.train.AdamOptimizer(learning_rate=LEARNING_RATE).minimize(error)
 # or less we can round it to the correct output.
 accuracy = tf.reduce_mean(tf.cast(tf.abs(outputs - predicted_outputs) < 0.5, tf.float32))
 
+print ("Finished defining graph")
 
 ################################################################################
 ##                           TRAINING LOOP                                    ##
@@ -117,6 +140,8 @@ for fold in fold_stances:
 
 valid_x, valid_y = generate_features(hold_out_stances, d, "holdout")
 
+print ("Finished separating folds")
+
 session = tf.Session()
 # For some reason it is our job to do this:
 session.run(tf.initialize_all_variables())
@@ -129,16 +154,17 @@ for epoch in range(1000):
         # x, y = generate_batch(num_bits=NUM_BITS, batch_size=BATCH_SIZE)
         # TODO replace above line with getting feature vectors for current batch
 
-				x = x_vals[fold]
-				y = y_vals[fold]
+        x = x_vals[fold]
+        y = y_vals[fold]
 				
-				epoch_error += session.run([error, train_fn], {
+        epoch_error += session.run([error, train_fn], {
             inputs: x,
             outputs: y,
         })[0]
+
     epoch_error /= ITERATIONS_PER_EPOCH
     valid_accuracy = session.run(accuracy, {
         inputs:  valid_x,
         outputs: valid_y,
     })
-    print "Epoch %d, train error: %.2f, valid accuracy: %.1f %%" % (epoch, epoch_error, valid_accuracy * 100.0)
+    print ("Epoch %d, train error: %.2f, valid accuracy: %.1f %%") % (epoch, epoch_error, valid_accuracy * 100.0)

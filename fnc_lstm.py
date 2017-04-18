@@ -60,7 +60,7 @@ OUTPUT_SIZE   = 1       # 1 bit per timestep
 TINY          = 1e-6    # to avoid NaNs in logs
 LEARNING_RATE = 0.01
 
-USE_LSTM = False
+USE_LSTM = True
 
 inputs  = tf.placeholder(tf.float32, (None, None, INPUT_SIZE))  # (time, batch, in)
 outputs = tf.placeholder(tf.float32, (None, None, OUTPUT_SIZE)) # (time, batch, out)
@@ -79,7 +79,7 @@ outputs = tf.placeholder(tf.float32, (None, None, OUTPUT_SIZE)) # (time, batch, 
 # Example LSTM cell with learnable zero_state can be found here:
 #    https://gist.github.com/nivwusquorum/160d5cf7e1e82c21fad3ebf04f039317
 if USE_LSTM:
-    cell = tf.contrib.rnn.LSTMCell(RNN_HIDDEN, state_is_tuple=True) #tf.contrib.rnn.BasicLSTMCell(RNN_HIDDEN, state_is_tuple=True)
+    cell = tf.contrib.rnn.BasicLSTMCell(RNN_HIDDEN, state_is_tuple=True) #tf.contrib.rnn.BasicLSTMCell(RNN_HIDDEN, state_is_tuple=True)
 else:
     cell = tf.nn.rnn_cell.BasicRNNCell(RNN_HIDDEN)
 

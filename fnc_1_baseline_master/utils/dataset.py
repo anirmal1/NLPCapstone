@@ -2,7 +2,7 @@ from csv import DictReader
 
 
 class DataSet():
-    def __init__(self, path="fnc-1"):
+    def __init__(self, path="fnc_1_baseline_master/fnc-1"):
         self.path = path
 
         print("Reading dataset")
@@ -28,7 +28,7 @@ class DataSet():
 
     def read(self,filename):
         rows = []
-        with open(self.path + "/" + filename, "r", encoding='utf-8') as table:
+        with open(self.path + "/" + filename, "r") as table:
             r = DictReader(table)
 
             for line in r:

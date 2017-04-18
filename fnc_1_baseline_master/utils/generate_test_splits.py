@@ -3,7 +3,7 @@ import os
 from collections import defaultdict
 
 
-def generate_hold_out_split (dataset, training = 0.8, base_dir="splits"):
+def generate_hold_out_split (dataset, training = 0.8, base_dir="fnc_1_baseline_master/splits"):
     r = random.Random()
     r.seed(1489215)
 
@@ -31,7 +31,7 @@ def read_ids(file,base):
         return ids
 
 
-def kfold_split(dataset, training = 0.8, n_folds = 10, base_dir="splits"):
+def kfold_split(dataset, training = 0.8, n_folds = 10, base_dir="fnc_1_baseline_master/splits"):
     if not (os.path.exists(base_dir+ "/"+ "training_ids.txt")
             and os.path.exists(base_dir+ "/"+ "hold_out_ids.txt")):
         generate_hold_out_split(dataset,training,base_dir)

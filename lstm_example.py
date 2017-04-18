@@ -22,8 +22,6 @@ import numpy as np
 import random
 import tensorflow as tf
 import tensorflow.contrib.layers as layers
-from fnc_1_baseline_master.utils.dataset import DataSet
-from fnc_1_baseline_master.utils.generate_test_splits import kfold_split, get_stances_for_folds
 
 map_fn = tf.map_fn #.python.functional_ops.map_fn
 
@@ -43,7 +41,6 @@ def as_bytes(num, final_size):
         num //= 2
     return res
 
-"""
 def generate_example(num_bits):
     a = random.randint(0, 2**(num_bits - 1) - 1)
     b = random.randint(0, 2**(num_bits - 1) - 1)
@@ -51,11 +48,9 @@ def generate_example(num_bits):
     return (as_bytes(a,  num_bits),
             as_bytes(b,  num_bits),
             as_bytes(res,num_bits))
-"""
 
-"""
 def generate_batch(num_bits, batch_size):
-    \"\"\"Generates instance of a problem.
+    """Generates instance of a problem.
 
     Returns
     -------
@@ -74,7 +69,7 @@ def generate_batch(num_bits, batch_size):
             b is bit index from the end
             i is example idx in batch
             n is always 0
-    \"\"\"
+    """
     x = np.empty((num_bits, batch_size, 2))
     y = np.empty((num_bits, batch_size, 1))
 
@@ -84,7 +79,7 @@ def generate_batch(num_bits, batch_size):
         x[:, i, 1] = b
         y[:, i, 0] = r
     return x, y
-"""
+
 
 ################################################################################
 ##                           GRAPH DEFINITION                                 ##
@@ -156,18 +151,9 @@ accuracy = tf.reduce_mean(tf.cast(tf.abs(outputs - predicted_outputs) < 0.5, tf.
 
 NUM_BITS = 10
 ITERATIONS_PER_EPOCH = 100
-# BATCH_SIZE = 16
+BATCH_SIZE = 16
 
-# valid_x, valid_y = generate_batch(num_bits=NUM_BITS, batch_size=100)
-# TODO replace above line with:
-# 	(1) split data into train test
-#		(2) figure out which data is train and test
-# 	(3) split train into batches
-d = DataSet()
-folds, hold_out = kfold_split(d, n_folds=10)
-fold_stances, hold_out_stances = get_stances_for_folds(d, folds, hold_out)
-
-
+valid_x, valid_y = generate_batch(num_bits=NUM_BITS, batch_size=100)
 
 session = tf.Session()
 # For some reason it is our job to do this:
@@ -178,11 +164,8 @@ for epoch in range(1000):
     for _ in range(ITERATIONS_PER_EPOCH):
         # here train_fn is what triggers backprop. error and accuracy on their
         # own do not trigger the backprop.
-        # x, y = generate_batch(num_bits=NUM_BITS, batch_size=BATCH_SIZE)
-        # TODO replace above line with getting the current batch
-
-				
-				epoch_error += session.run([error, train_fn], {
+        x, y = generate_batch(num_bits=NUM_BITS, batch_size=BATCH_SIZE)
+        epoch_error += session.run([error, train_fn], {
             inputs: x,
             outputs: y,
         })[0]

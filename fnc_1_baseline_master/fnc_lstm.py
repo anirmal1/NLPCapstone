@@ -22,8 +22,8 @@ import numpy as np
 import random
 import tensorflow as tf
 import tensorflow.contrib.layers as layers
-from fnc_1_baseline_master.utils.dataset import DataSet
-from fnc_1_baseline_master.utils.generate_test_splits import kfold_split, get_stances_for_folds
+from utils.dataset import DataSet
+from utils.generate_test_splits import kfold_split, get_stances_for_folds
 
 map_fn = tf.map_fn #.python.functional_ops.map_fn
 
@@ -163,10 +163,6 @@ ITERATIONS_PER_EPOCH = 100
 # 	(1) split data into train test
 #		(2) figure out which data is train and test
 # 	(3) split train into batches
-d = DataSet()
-folds, hold_out = kfold_split(d, n_folds=10)
-fold_stances, hold_out_stances = get_stances_for_folds(d, folds, hold_out)
-
 
 
 session = tf.Session()
@@ -180,8 +176,6 @@ for epoch in range(1000):
         # own do not trigger the backprop.
         # x, y = generate_batch(num_bits=NUM_BITS, batch_size=BATCH_SIZE)
         # TODO replace above line with getting the current batch
-
-				
 				epoch_error += session.run([error, train_fn], {
             inputs: x,
             outputs: y,

@@ -24,6 +24,7 @@ import tensorflow as tf
 import tensorflow.contrib.layers as layers
 from fnc_1_baseline_master.utils.dataset import DataSet
 from fnc_1_baseline_master.utils.generate_test_splits import kfold_split, get_stances_for_folds
+from fnc_1_baseline_master.fnc_kfold import generate_features
 
 map_fn = tf.map_fn #.python.functional_ops.map_fn
 
@@ -107,7 +108,14 @@ folds, hold_out = kfold_split(d, n_folds=10)
 fold_stances, hold_out_stances = get_stances_for_folds(d, folds, hold_out)
 
 # TODO generate feature vectors for files
-#
+# (tbh just copying what they do in the baseline)
+x_vals = {}
+y_vals = {}
+
+for fold in fold_stances:
+	x_vals[fold], y_vals[fold] = generate_features(fold_stances[fold], d, str(fold))
+
+valid_x, valid_y = generate_features(hold_out_stances, d, "holdout")
 
 session = tf.Session()
 # For some reason it is our job to do this:
@@ -115,12 +123,14 @@ session.run(tf.initialize_all_variables())
 
 for epoch in range(1000):
     epoch_error = 0
-    for _ in range(ITERATIONS_PER_EPOCH):
+    for fold in fold_stances: # for _ in range(ITERATIONS_PER_EPOCH):
         # here train_fn is what triggers backprop. error and accuracy on their
         # own do not trigger the backprop.
         # x, y = generate_batch(num_bits=NUM_BITS, batch_size=BATCH_SIZE)
         # TODO replace above line with getting feature vectors for current batch
 
+				x = x_vals[fold]
+				y = y_vals[fold]
 				
 				epoch_error += session.run([error, train_fn], {
             inputs: x,

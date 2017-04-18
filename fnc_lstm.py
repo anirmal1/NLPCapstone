@@ -28,65 +28,6 @@ from fnc_1_baseline_master.utils.generate_test_splits import kfold_split, get_st
 map_fn = tf.map_fn #.python.functional_ops.map_fn
 
 ################################################################################
-##                           DATASET GENERATION                               ##
-##                                                                            ##
-##  The problem we are trying to solve is adding two binary numbers. The      ##
-##  numbers are reversed, so that the state of RNN can add the numbers        ##
-##  perfectly provided it can learn to store carry in the state. Timestep t   ##
-##  corresponds to bit len(number) - t.                                       ##
-################################################################################
-
-def as_bytes(num, final_size):
-    res = []
-    for _ in range(final_size):
-        res.append(num % 2)
-        num //= 2
-    return res
-
-"""
-def generate_example(num_bits):
-    a = random.randint(0, 2**(num_bits - 1) - 1)
-    b = random.randint(0, 2**(num_bits - 1) - 1)
-    res = a + b
-    return (as_bytes(a,  num_bits),
-            as_bytes(b,  num_bits),
-            as_bytes(res,num_bits))
-"""
-
-"""
-def generate_batch(num_bits, batch_size):
-    \"\"\"Generates instance of a problem.
-
-    Returns
-    -------
-    x: np.array
-        two numbers to be added represented by bits.
-        shape: b, i, n
-        where:
-            b is bit index from the end
-            i is example idx in batch
-            n is one of [0,1] depending for first and
-                second summand respectively
-    y: np.array
-        the result of the addition
-        shape: b, i, n
-        where:
-            b is bit index from the end
-            i is example idx in batch
-            n is always 0
-    \"\"\"
-    x = np.empty((num_bits, batch_size, 2))
-    y = np.empty((num_bits, batch_size, 1))
-
-    for i in range(batch_size):
-        a, b, r = generate_example(num_bits)
-        x[:, i, 0] = a
-        x[:, i, 1] = b
-        y[:, i, 0] = r
-    return x, y
-"""
-
-################################################################################
 ##                           GRAPH DEFINITION                                 ##
 ################################################################################
 

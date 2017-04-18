@@ -1,5 +1,5 @@
 from csv import DictReader
-
+import codecs
 
 class DataSet():
     def __init__(self, path="fnc_1_baseline_master/fnc-1"):
@@ -28,7 +28,7 @@ class DataSet():
 
     def read(self,filename):
         rows = []
-        with open(self.path + "/" + filename, "r") as table:
+        with codecs.open(self.path + "/" + filename, "r") as table:
             r = DictReader(table)
 
             for line in r:

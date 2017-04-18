@@ -10,7 +10,7 @@ _wnl = nltk.WordNetLemmatizer()
 
 
 def normalize_word(w):
-    return _wnl.lemmatize(w).lower()
+    return _wnl.lemmatize(w.decode('utf-8')).lower()
 
 
 def get_tokenized_lemmas(s):

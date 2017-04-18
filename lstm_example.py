@@ -154,6 +154,8 @@ ITERATIONS_PER_EPOCH = 100
 BATCH_SIZE = 16
 
 valid_x, valid_y = generate_batch(num_bits=NUM_BITS, batch_size=100)
+print tf.shape(inputs)
+print(valid_x.shape)
 
 session = tf.Session()
 # For some reason it is our job to do this:

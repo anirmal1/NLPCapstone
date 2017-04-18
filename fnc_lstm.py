@@ -79,7 +79,7 @@ outputs = tf.placeholder(tf.float32, (None, None, OUTPUT_SIZE)) # (time, batch, 
 # Example LSTM cell with learnable zero_state can be found here:
 #    https://gist.github.com/nivwusquorum/160d5cf7e1e82c21fad3ebf04f039317
 if USE_LSTM:
-    cell = tf.contrib.rnn.LSTMCell #tf.contrib.rnn.BasicLSTMCell(RNN_HIDDEN, state_is_tuple=True)
+    cell = tf.contrib.rnn.LSTMCell(RNN_HIDDEN, state_is_tuple=True) #tf.contrib.rnn.BasicLSTMCell(RNN_HIDDEN, state_is_tuple=True)
 else:
     cell = tf.nn.rnn_cell.BasicRNNCell(RNN_HIDDEN)
 
@@ -155,8 +155,12 @@ for epoch in range(1000):
         # TODO replace above line with getting feature vectors for current batch
 
         x = x_vals[fold]
+        print(x.shape)
         y = y_vals[fold]
-				
+			
+        # print(x)
+        # print(y)
+	
         epoch_error += session.run([error, train_fn], {
             inputs: x,
             outputs: y,

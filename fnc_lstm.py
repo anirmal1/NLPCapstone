@@ -24,7 +24,6 @@ import tensorflow as tf
 import tensorflow.contrib.layers as layers
 from fnc_1_baseline_master.utils.dataset import DataSet
 from fnc_1_baseline_master.utils.generate_test_splits import kfold_split, get_stances_for_folds
-# from fnc_1_baseline_master.fnc_kfold import generate_features
 from fnc_1_baseline_master.feature_engineering import refuting_features, polarity_features, hand_features, gen_or_load_feats
 from fnc_1_baseline_master.feature_engineering import word_overlap_features
 from fnc_1_baseline_master.utils.score import report_score, LABELS, score_submission
@@ -46,7 +45,13 @@ def generate_features(stances,dataset,name):
     X_hand = gen_or_load_feats(hand_features, h, b, "fnc_1_baseline_master/features/hand."+name+".npy")
 
     X = np.c_[X_hand, X_polarity, X_refuting, X_overlap]
+
+    X = X.reshape(len(y), 44, 1)
+    y = np.asarray(y).reshape(len(y), 1, 1)
+
+
     return X,y
+	
 
 map_fn = tf.map_fn #.python.functional_ops.map_fn
 
@@ -54,8 +59,8 @@ map_fn = tf.map_fn #.python.functional_ops.map_fn
 ##                           GRAPH DEFINITION                                 ##
 ################################################################################
 
-INPUT_SIZE    = 2       # 2 bits per timestep
-RNN_HIDDEN    = 20
+INPUT_SIZE    = 1 #2       # 2 bits per timestep
+RNN_HIDDEN    = 10
 OUTPUT_SIZE   = 1       # 1 bit per timestep
 TINY          = 1e-6    # to avoid NaNs in logs
 LEARNING_RATE = 0.01
@@ -79,7 +84,7 @@ outputs = tf.placeholder(tf.float32, (None, None, OUTPUT_SIZE)) # (time, batch, 
 # Example LSTM cell with learnable zero_state can be found here:
 #    https://gist.github.com/nivwusquorum/160d5cf7e1e82c21fad3ebf04f039317
 if USE_LSTM:
-    cell = tf.contrib.rnn.BasicLSTMCell(RNN_HIDDEN, state_is_tuple=True) #tf.contrib.rnn.BasicLSTMCell(RNN_HIDDEN, state_is_tuple=True)
+    cell = tf.nn.rnn_cell.BasicLSTMCell(RNN_HIDDEN, state_is_tuple=True) #tf.contrib.rnn.BasicLSTMCell(RNN_HIDDEN, state_is_tuple=True)
 else:
     cell = tf.nn.rnn_cell.BasicRNNCell(RNN_HIDDEN)
 
@@ -123,20 +128,17 @@ NUM_BITS = 10
 ITERATIONS_PER_EPOCH = 100
 # BATCH_SIZE = 16
 
-# valid_x, valid_y = generate_batch(num_bits=NUM_BITS, batch_size=100)
 
 # acquire data from files
 d = DataSet()
 folds, hold_out = kfold_split(d, n_folds=10)
 fold_stances, hold_out_stances = get_stances_for_folds(d, folds, hold_out)
 
-# TODO generate feature vectors for files
-# (tbh just copying what they do in the baseline)
 x_vals = {}
 y_vals = {}
 
 for fold in fold_stances:
-	x_vals[fold], y_vals[fold] = generate_features(fold_stances[fold], d, str(fold))
+  x_vals[fold], y_vals[fold] = generate_features(fold_stances[fold], d, str(fold))
 
 valid_x, valid_y = generate_features(hold_out_stances, d, "holdout")
 
@@ -153,22 +155,17 @@ for epoch in range(1000):
         # own do not trigger the backprop.
         # x, y = generate_batch(num_bits=NUM_BITS, batch_size=BATCH_SIZE)
         # TODO replace above line with getting feature vectors for current batch
-
         x = x_vals[fold]
-        print(x.shape)
         y = y_vals[fold]
-			
-        # print(x)
-        # print(y)
-	
+        
         epoch_error += session.run([error, train_fn], {
             inputs: x,
             outputs: y,
         })[0]
 
-    epoch_error /= ITERATIONS_PER_EPOCH
+    epoch_error /= len(fold_stances) # ITERATIONS_PER_EPOCH
     valid_accuracy = session.run(accuracy, {
         inputs:  valid_x,
         outputs: valid_y,
     })
-    print ("Epoch %d, train error: %.2f, valid accuracy: %.1f %%") % (epoch, epoch_error, valid_accuracy * 100.0)
+    print ("Epoch %d, train error: %.2f, valid accuracy: %.1f %%" % (epoch, epoch_error, valid_accuracy * 100.0))

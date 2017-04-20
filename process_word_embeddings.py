@@ -9,7 +9,7 @@ stopwords = nltk.corpus.stopwords.words('english')
 
 # builds and returns word2vec model using glove word vector embeddings
 def build_word_vectors_model():
-	model = KeyedVectors.load_word2vec_format('external_data/glove.6B.100d.txt', binary=False)
+	model = KeyedVectors.load_word2vec_format('/homes/iws/liliang/WindowsFolders/glove.6B.100d.txt', binary=False)
 	return model
 
 # get the average word vector for a sequence (like in the stanford paper, we can get the average for 

@@ -22,6 +22,7 @@ import numpy as np
 import random
 import tensorflow as tf
 import tensorflow.contrib.layers as layers
+from process_word_embeddings import build_word_vectors_model 
 from fnc_1_baseline_master.utils.dataset import DataSet
 from fnc_1_baseline_master.utils.generate_test_splits import kfold_split, get_stances_for_folds
 from fnc_1_baseline_master.feature_engineering import refuting_features, polarity_features, hand_features, gen_or_load_feats
@@ -54,6 +55,9 @@ def generate_features(stances,dataset,name):
 	
 
 map_fn = tf.map_fn #.python.functional_ops.map_fn
+
+'''BUILDING WORD VECTORS'''
+model = build_word_vectors_model()
 
 ################################################################################
 ##                           GRAPH DEFINITION                                 ##

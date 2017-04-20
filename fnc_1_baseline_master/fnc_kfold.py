@@ -25,6 +25,7 @@ def generate_features(stances,dataset,name):
     X_hand = gen_or_load_feats(hand_features, h, b, "features/hand."+name+".npy")
 
     X = np.c_[X_hand, X_polarity, X_refuting, X_overlap]
+    print (X.shape)
     return X,y
 
 if __name__ == "__main__":

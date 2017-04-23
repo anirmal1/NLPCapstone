@@ -22,7 +22,7 @@ import numpy as np
 import random
 import tensorflow as tf
 import tensorflow.contrib.layers as layers
-from process_word_embeddings import build_word_vectors_model 
+import word_embeddings
 from fnc_1_baseline_master.utils.dataset import DataSet
 from fnc_1_baseline_master.utils.generate_test_splits import kfold_split, get_stances_for_folds
 from fnc_1_baseline_master.feature_engineering import refuting_features, polarity_features, hand_features, gen_or_load_feats
@@ -30,6 +30,19 @@ from fnc_1_baseline_master.feature_engineering import word_overlap_features
 from fnc_1_baseline_master.utils.score import report_score, LABELS, score_submission
 
 from fnc_1_baseline_master.utils.system import parse_params, check_version
+
+################################################################################
+##                             WORD EMBEDDINGS                                ##
+################################################################################
+d = DataSet()
+folds, hold_out = kfold_split(d, n_folds=10)
+fold_stances, hold_out_stances = get_stances_for_folds(d, folds, hold_out)
+
+
+
+################################################################################
+##                             GLOBAL FEATURES                                ##
+################################################################################
 
 
 def generate_features(stances,dataset,name):
@@ -52,12 +65,6 @@ def generate_features(stances,dataset,name):
 
 
     return X,y
-	
-
-map_fn = tf.map_fn #.python.functional_ops.map_fn
-
-'''BUILDING WORD VECTORS'''
-model = build_word_vectors_model()
 
 ################################################################################
 ##                           GRAPH DEFINITION                                 ##
@@ -88,7 +95,8 @@ outputs = tf.placeholder(tf.float32, (None, None, OUTPUT_SIZE)) # (time, batch, 
 # Example LSTM cell with learnable zero_state can be found here:
 #    https://gist.github.com/nivwusquorum/160d5cf7e1e82c21fad3ebf04f039317
 if USE_LSTM:
-    cell = tf.nn.rnn_cell.BasicLSTMCell(RNN_HIDDEN, state_is_tuple=True) #tf.contrib.rnn.BasicLSTMCell(RNN_HIDDEN, state_is_tuple=True)
+    cell = tf.nn.rnn_cell.BasicLSTMCell(RNN_HIDDEN, state_is_tuple=True)
+    #tf.contrib.rnn.BasicLSTMCell(RNN_HIDDEN, state_is_tuple=True)
 else:
     cell = tf.nn.rnn_cell.BasicRNNCell(RNN_HIDDEN)
 
@@ -161,7 +169,7 @@ for epoch in range(1000):
         # TODO replace above line with getting feature vectors for current batch
         x = x_vals[fold]
         y = y_vals[fold]
-        
+
         epoch_error += session.run([error, train_fn], {
             inputs: x,
             outputs: y,

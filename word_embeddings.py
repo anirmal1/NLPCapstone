@@ -1,11 +1,10 @@
 import numpy as np
 
-class WordEmbeddingsMap():
+class WordEmbeddings():
 
 	def __init__(self):
-		# CHANGE WORD EMBEDDING HERE
+		# Load GloVe word embeddings
 		f = open('/homes/iws/liliang/WindowsFolders/glove.6B.100d.txt')
-		self.dataset = DataSet()
 		self.word_vector_map = {}
 		for line in f:
 			split = line.split()
@@ -14,15 +13,19 @@ class WordEmbeddingsMap():
 			self.word_vector_map[word_key] = vector
 	
 		f.close()
-		print("created word matrix")
-		# return word_vector_map
+		print("Loaded GloVe word embeddings")
 	
 	# should we return None for unk words?
 	def get_embedding_for_word(self, word):
 		return self.word_vector_map[word] if word in self.word_vector_map else None
 
-	def get_embedding_for_text(self, text):
-		
+	def get_embedding_for_sentence(self, sentence):
+		words = sentence.split()
+		vectorList = []
+		for word in words:
+			if get_embedding_for_word is not None:
+				vectorList.append(self.word_vector_map[word])
+		return np.vstack(vectorList)
 
 	def create_batches(self, n):
 		pass

@@ -22,7 +22,7 @@ import numpy as np
 import random
 import tensorflow as tf
 import tensorflow.contrib.layers as layers
-import word_embeddings
+from word_embeddings import WordEmbeddings
 from fnc_1_baseline_master.utils.dataset import DataSet
 from fnc_1_baseline_master.utils.generate_test_splits import kfold_split, get_stances_for_folds
 from fnc_1_baseline_master.feature_engineering import refuting_features, polarity_features, hand_features, gen_or_load_feats
@@ -40,9 +40,11 @@ fold_stances, hold_out_stances = get_stances_for_folds(d, folds, hold_out)
 embeddings = WordEmbeddings()
 
 def get_word_vectors_for_batch(stances, dataset, word_embeddings):
-    b, y = [], [], [] # bodies, true labels
+    b, y = [], [] # bodies, true labels
+    
     for stance in stances:
         y.append(LABELS.index(stance['Stance']))
+        #print(stance)
         b.append(dataset.articles[stance['Body ID']])
 
     embeddings_list = []
@@ -83,7 +85,7 @@ def generate_features(stances,dataset,name):
 ##                           GRAPH DEFINITION                                 ##
 ################################################################################
 
-INPUT_SIZE    = 1 #2       # 2 bits per timestep
+INPUT_SIZE    = 100 #2       # 2 bits per timestep
 RNN_HIDDEN    = 10
 OUTPUT_SIZE   = 1       # 1 bit per timestep
 TINY          = 1e-6    # to avoid NaNs in logs
@@ -108,8 +110,7 @@ outputs = tf.placeholder(tf.float32, (None, None, OUTPUT_SIZE)) # (time, batch, 
 # Example LSTM cell with learnable zero_state can be found here:
 #    https://gist.github.com/nivwusquorum/160d5cf7e1e82c21fad3ebf04f039317
 if USE_LSTM:
-    cell = tf.nn.rnn_cell.BasicLSTMCell(RNN_HIDDEN, state_is_tuple=True)
-    #tf.contrib.rnn.BasicLSTMCell(RNN_HIDDEN, state_is_tuple=True)
+    cell = tf.contrib.rnn.BasicLSTMCell(RNN_HIDDEN, state_is_tuple=True)
 else:
     cell = tf.nn.rnn_cell.BasicRNNCell(RNN_HIDDEN)
 
@@ -130,7 +131,7 @@ rnn_outputs, rnn_states = tf.nn.dynamic_rnn(cell, inputs, initial_state=initial_
 final_projection = lambda x: layers.linear(x, num_outputs=OUTPUT_SIZE, activation_fn=tf.nn.sigmoid)
 
 # apply projection to every timestep.
-predicted_outputs = map_fn(final_projection, rnn_outputs)
+predicted_outputs = tf.map_fn(final_projection, rnn_outputs)
 
 # compute elementwise cross entropy.
 error = -(outputs * tf.log(predicted_outputs + TINY) + (1.0 - outputs) * tf.log(1.0 - predicted_outputs + TINY))

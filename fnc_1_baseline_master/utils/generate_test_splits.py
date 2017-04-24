@@ -42,7 +42,6 @@ def kfold_split(dataset, training = 0.8, n_folds = 10, base_dir="fnc_1_baseline_
     folds = []
     for k in range(n_folds):
         folds.append(training_ids[int(k*len(training_ids)/n_folds):int((k+1)*len(training_ids)/n_folds)])
-
     return folds,hold_out_ids
 
 

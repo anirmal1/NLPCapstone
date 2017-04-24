@@ -21,11 +21,11 @@ class DataSet():
 
         # Use truncated articles instead
         trunc_art = trunc_articles()
-	
-        #copy all bodies into a dictionary
-        for body_id, body in enumerate(trunc_art):
+        
+	#copy all bodies into a dictionary
+        for body_id in trunc_art:
             #self.articles[int(article['Body ID'])] = article['articleBody']
-            self.articles[int(body_id)] = body
+            self.articles[int(body_id)] = trunc_art[body_id]
 
         print("Total stances: " + str(len(self.stances)))
         print("Total bodies: " + str(len(self.articles)))

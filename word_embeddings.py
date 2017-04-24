@@ -20,10 +20,9 @@ class WordEmbeddings():
 		return self.word_vector_map[word] if word in self.word_vector_map else None
 
 	def get_embedding_for_sentence(self, sentence):
-		words = sentence.split()
 		vectorList = []
-		for word in words:
-			if get_embedding_for_word is not None:
+		for word in sentence:
+			if self.get_embedding_for_word(word) is not None:
 				vectorList.append(self.word_vector_map[word])
 		return np.hstack(vectorList)
 

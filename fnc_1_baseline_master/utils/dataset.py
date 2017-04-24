@@ -1,6 +1,6 @@
 from csv import DictReader
 import codecs
-from truncate_articles import trunc_articles
+from fnc_1_baseline_master.utils.truncate_articles import trunc_articles
 
 class DataSet():
     #path="/fnc_1_baseline_master/fnc-1"

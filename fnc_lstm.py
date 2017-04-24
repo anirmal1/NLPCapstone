@@ -35,15 +35,28 @@ from fnc_1_baseline_master.utils.system import parse_params, check_version
 ##                             WORD EMBEDDINGS                                ##
 ################################################################################
 d = DataSet()
-folds, hold_out = kfold_split(d, n_folds=10)
+folds, hold_out = kfold_split(d, n_folds=512)
 fold_stances, hold_out_stances = get_stances_for_folds(d, folds, hold_out)
+embeddings = WordEmbeddings()
 
+def get_word_vectors_for_batch(stances, dataset, word_embeddings):
+    b, y = [], [], [] # bodies, true labels
+    for stance in stances:
+        y.append(LABELS.index(stance['Stance']))
+        b.append(dataset.articles[stance['Body ID']])
+
+    embeddings_list = []
+    for article in b:
+       sentence_embedding = word_embeddings.get_embedding_for_sentence(article)
+       embeddings_list.append(sentence_embedding)
+
+    return np.vstack(embeddings_list)
+    
 
 
 ################################################################################
 ##                             GLOBAL FEATURES                                ##
 ################################################################################
-
 
 def generate_features(stances,dataset,name):
     h, b, y = [],[],[]
@@ -142,17 +155,17 @@ ITERATIONS_PER_EPOCH = 100
 
 
 # acquire data from files
-d = DataSet()
-folds, hold_out = kfold_split(d, n_folds=10)
-fold_stances, hold_out_stances = get_stances_for_folds(d, folds, hold_out)
+#d = DataSet()
+# folds, hold_out = kfold_split(d, n_folds=10)
+# fold_stances, hold_out_stances = get_stances_for_folds(d, folds, hold_out)
 
 x_vals = {}
 y_vals = {}
 
 for fold in fold_stances:
-  x_vals[fold], y_vals[fold] = generate_features(fold_stances[fold], d, str(fold))
+  x_vals[fold], y_vals[fold] = get_word_vectors_for_batch(fold_stances[fold], d, embeddings) # generate_features(fold_stances[fold], d, str(fold))
 
-valid_x, valid_y = generate_features(hold_out_stances, d, "holdout")
+valid_x, valid_y = get_word_vectors_for_batch(hold_out_stances, d, embeddings) # generate_features(hold_out_stances, d, "holdout")
 
 print ("Finished separating folds")
 

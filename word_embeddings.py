@@ -25,7 +25,7 @@ class WordEmbeddings():
 		for word in words:
 			if get_embedding_for_word is not None:
 				vectorList.append(self.word_vector_map[word])
-		return np.vstack(vectorList)
+		return np.hstack(vectorList)
 
 	def create_batches(self, n):
 		pass

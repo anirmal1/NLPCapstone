@@ -38,7 +38,7 @@ def get_articles_word_vectors(stances, dataset, word_embeddings):
     b, y = [], [] # bodies, true labels
     
     for stance in stances:
-        y.append([LABELS.index(stance['Stance'])])
+        y.append([[LABELS.index(stance['Stance'])]])
         #print(stance)
         b.append(dataset.articles[stance['Body ID']])
 
@@ -88,8 +88,8 @@ LEARNING_RATE = 0.01
 
 USE_LSTM = True
 
-inputs  = tf.placeholder(tf.float32, (None, None, INPUT_SIZE))  # (time, batch, in)
-outputs = tf.placeholder(tf.float32, (None, OUTPUT_SIZE)) # (time, batch, out)
+inputs  = tf.placeholder(tf.float32, (None, 200, INPUT_SIZE))  # (batch, time, in)
+outputs = tf.placeholder(tf.float32, (None, 1, OUTPUT_SIZE)) # (batch, time, out)
 
 ## Here cell can be any function you want, provided it has two attributes:
 #     - cell.zero_state(batch_size, dtype)- tensor which is an initial value
@@ -112,13 +112,16 @@ else:
 # but in principle it could be a learnable parameter. This is a bit tricky
 # to do for LSTM's tuple state, but can be achieved by creating two vector
 # Variables, which are then tiled along batch dimension and grouped into tuple.
-batch_size    = tf.shape(inputs)[1]
+batch_size    = tf.shape(inputs)[0]
 initial_state = cell.zero_state(batch_size, tf.float32)
 
 # Given inputs (time, batch, input_size) outputs a tuple
 #  - outputs: (time, batch, output_size)  [do not mistake with OUTPUT_SIZE]
 #  - states:  (time, batch, hidden_size)
-rnn_outputs, rnn_states = tf.nn.dynamic_rnn(cell, inputs, initial_state=initial_state, time_major=True)
+rnn_outputs, rnn_states = tf.nn.dynamic_rnn(cell, inputs, initial_state=initial_state, time_major=False)
+
+# Reshape output tensor
+#rnn_outputs_reshaped = tf.reshape(rnn_outputs, [200, -1])
 
 # project output from rnn output size to OUTPUT_SIZE. Sometimes it is worth adding
 # an extra layer here.
@@ -179,7 +182,7 @@ for epoch in range(1000):
         x = x_vals[fold]
         y = y_vals[fold]
         print("output shape for fold " + str(fold) + " " + str(outputs.shape))
-
+        
         epoch_error += session.run([error, train_fn], {
             inputs: x,
             outputs: y,

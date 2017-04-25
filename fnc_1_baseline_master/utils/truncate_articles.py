@@ -9,6 +9,10 @@ def trunc_articles():
 		words = article.split()
 		if len(words) > 200:
 			words = words[:200]
+		else:
+			padding_length = 200 - len(words)
+			for j in range(padding_length):
+				words.append(' ') # special padding symbol (a space should not have a word embedding) 
 		id_article_dict[df["Body ID"][i]] = words
-	return id_article_dict
+	return id_article_dict # might want to add in a return for the original length of the sentence here too
 			

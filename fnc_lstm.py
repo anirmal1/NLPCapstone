@@ -38,17 +38,16 @@ def get_articles_word_vectors(stances, dataset, word_embeddings):
     b, y = [], [] # bodies, true labels
     
     for stance in stances:
-        y.append(LABELS.index(stance['Stance']))
+        y.append([LABELS.index(stance['Stance'])])
         #print(stance)
         b.append(dataset.articles[stance['Body ID']])
 
     embeddings_list = []
     for article in b:
        sentence_embedding = word_embeddings.get_embedding_for_sentence(article)
-       print(sentence_embedding.shape)
        embeddings_list.append(sentence_embedding)
 
-    return np.vstack(embeddings_list)
+    return np.array(embeddings_list), y # TODO how do you properly return the embeddings in 3 dimensions?? :(
     
 
 
@@ -90,8 +89,7 @@ LEARNING_RATE = 0.01
 USE_LSTM = True
 
 inputs  = tf.placeholder(tf.float32, (None, None, INPUT_SIZE))  # (time, batch, in)
-outputs = tf.placeholder(tf.float32, (None, None, OUTPUT_SIZE)) # (time, batch, out)
-
+outputs = tf.placeholder(tf.float32, (None, OUTPUT_SIZE)) # (time, batch, out)
 
 ## Here cell can be any function you want, provided it has two attributes:
 #     - cell.zero_state(batch_size, dtype)- tensor which is an initial value
@@ -150,7 +148,6 @@ NUM_BITS = 10
 ITERATIONS_PER_EPOCH = 100
 # BATCH_SIZE = 16
 
-
 # acquire data from files
 # NOTE: For the word vectors, folds really means batches
 d = DataSet()
@@ -174,19 +171,20 @@ session.run(tf.initialize_all_variables())
 
 for epoch in range(1000):
     epoch_error = 0
-    for fold in fold_stances: # for _ in range(ITERATIONS_PER_EPOCH):
+    for fold in x_vals:  #for _ in range(ITERATIONS_PER_EPOCH):
         # here train_fn is what triggers backprop. error and accuracy on their
         # own do not trigger the backprop.
         # x, y = generate_batch(num_bits=NUM_BITS, batch_size=BATCH_SIZE)
         # TODO replace above line with getting feature vectors for current batch
         x = x_vals[fold]
         y = y_vals[fold]
+        print("output shape for fold " + str(fold) + " " + str(outputs.shape))
 
         epoch_error += session.run([error, train_fn], {
             inputs: x,
             outputs: y,
         })[0]
-
+    
     epoch_error /= len(fold_stances) # ITERATIONS_PER_EPOCH
     valid_accuracy = session.run(accuracy, {
         inputs:  valid_x,

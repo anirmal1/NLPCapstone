@@ -154,7 +154,7 @@ ITERATIONS_PER_EPOCH = 100
 # acquire data from files
 # NOTE: For the word vectors, folds really means batches
 d = DataSet()
-folds, hold_out = kfold_split(d, n_folds=32)
+folds, hold_out = kfold_split(d, n_folds=512)
 fold_stances, hold_out_stances = get_stances_for_folds(d, folds, hold_out)
 embeddings = WordEmbeddings()
 
@@ -170,7 +170,7 @@ print ("Finished separating folds")
 
 session = tf.Session()
 # For some reason it is our job to do this:
-session.run(tf.initialize_all_variables())
+session.run(tf.global_variables_initializer())
 
 for epoch in range(1000):
     epoch_error = 0
@@ -181,14 +181,13 @@ for epoch in range(1000):
         # TODO replace above line with getting feature vectors for current batch
         x = x_vals[fold]
         y = y_vals[fold]
-        print("output shape for fold " + str(fold) + " " + str(outputs.shape))
         
         epoch_error += session.run([error, train_fn], {
             inputs: x,
             outputs: y,
         })[0]
     
-    epoch_error /= len(fold_stances) # ITERATIONS_PER_EPOCH
+    epoch_error /= len(x_vals) #len(fold_stances) # ITERATIONS_PER_EPOCH
     valid_accuracy = session.run(accuracy, {
         inputs:  valid_x,
         outputs: valid_y,

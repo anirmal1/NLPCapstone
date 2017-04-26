@@ -27,7 +27,3 @@ class WordEmbeddings():
 			else:
 				vectorList.append(np.zeros(100)) # to address the dimensions issue (not sure if this is right tho)
 		return np.vstack(vectorList)
-
-	def create_batches(self, n):
-		pass
-

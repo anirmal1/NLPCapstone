@@ -35,11 +35,11 @@ from fnc_1_baseline_master.utils.system import parse_params, check_version
 ##                             WORD EMBEDDINGS                                ##
 ################################################################################
 def get_articles_word_vectors(stances, dataset, word_embeddings):
-    b, y = [], [] # bodies, true labels
+    b, y, h = [], [], []  # bodies, true labels, headlines
     
     for stance in stances:
         y.append([[LABELS.index(stance['Stance'])]])
-        #print(stance)
+        h.append(stance['Headline'])
         b.append(dataset.articles[stance['Body ID']])
 
     embeddings_list = []
@@ -47,7 +47,12 @@ def get_articles_word_vectors(stances, dataset, word_embeddings):
        sentence_embedding = word_embeddings.get_embedding_for_sentence(article)
        embeddings_list.append(sentence_embedding)
 
-    return np.array(embeddings_list), y # TODO how do you properly return the embeddings in 3 dimensions?? :(
+    headline_embeddings_list = []
+    for headline in h:
+       embedding = word_embeddings.get_embedding_for_sentence(headline)
+       headline_embeddings_list.append(embedding)
+
+    return np.array(headline_embeddings_list), np.array(embeddings_list), y # TODO how do you properly return the embeddings in 3 dimensions?? :(
     
 
 
@@ -158,13 +163,14 @@ folds, hold_out = kfold_split(d, n_folds=512)
 fold_stances, hold_out_stances = get_stances_for_folds(d, folds, hold_out)
 embeddings = WordEmbeddings()
 
-x_vals = {}
+x_articles = {}
+x_headlines = {}
 y_vals = {}
 
 for fold in fold_stances:
-  x_vals[fold], y_vals[fold] = get_articles_word_vectors(fold_stances[fold], d, embeddings) # generate_features(fold_stances[fold], d, str(fold))
+  x_headlines[fold], x_articles[fold], y_vals[fold] = get_articles_word_vectors(fold_stances[fold], d, embeddings) # generate_features(fold_stances[fold], d, str(fold))
 
-valid_x, valid_y = get_articles_word_vectors(hold_out_stances, d, embeddings) # generate_features(hold_out_stances, d, "holdout")
+valid_x_headlines, valid_x_articles, valid_y = get_articles_word_vectors(hold_out_stances, d, embeddings) # generate_features(hold_out_stances, d, "holdout")
 
 print ("Finished separating folds")
 
@@ -179,7 +185,7 @@ for epoch in range(1000):
         # own do not trigger the backprop.
         # x, y = generate_batch(num_bits=NUM_BITS, batch_size=BATCH_SIZE)
         # TODO replace above line with getting feature vectors for current batch
-        x = x_vals[fold]
+        x = x_articles[fold]
         y = y_vals[fold]
         
         epoch_error += session.run([error, train_fn], {
@@ -189,7 +195,7 @@ for epoch in range(1000):
     
     epoch_error /= len(x_vals) #len(fold_stances) # ITERATIONS_PER_EPOCH
     valid_accuracy = session.run(accuracy, {
-        inputs:  valid_x,
+        inputs:  valid_x_articles,
         outputs: valid_y,
     })
     print ("Epoch %d, train error: %.2f, valid accuracy: %.1f %%" % (epoch, epoch_error, valid_accuracy * 100.0))

@@ -4,7 +4,7 @@ from fnc_1_baseline_master.utils.truncate_articles import trunc_articles
 
 class DataSet():
     #path="/fnc_1_baseline_master/fnc-1"
-    def __init__(self, path="/homes/iws/liliang/WindowsFolders/NLPCapstone/fnc_1_baseline_master/fnc-1"):
+    def __init__(self, path="fnc_1_baseline_master/fnc-1"):
         self.path = path
 
         print("Reading dataset")

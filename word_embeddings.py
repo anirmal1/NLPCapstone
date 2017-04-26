@@ -4,7 +4,7 @@ class WordEmbeddings():
 
 	def __init__(self):
 		# Load GloVe word embeddings
-		f = open('/homes/iws/liliang/WindowsFolders/glove.6B.100d.txt')
+		f = open('../../WindowsFolders/glove.6B.100d.txt')
 		self.word_vector_map = {}
 		for line in f:
 			split = line.split()

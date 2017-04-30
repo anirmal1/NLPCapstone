@@ -3,7 +3,7 @@ import numpy as np
 
 from sklearn.ensemble import GradientBoostingClassifier
 from sklearn import svm
-from fnc_1_baseline_master.feature_engineering import discuss_features, refuting_features, polarity_features, hand_features, gen_or_load_feats
+from fnc_1_baseline_master.feature_engineering import reg_counts, discuss_features, refuting_features, polarity_features, hand_features, gen_or_load_feats
 from fnc_1_baseline_master.feature_engineering import word_overlap_features, LIWC_lexicons
 from fnc_1_baseline_master.utils.dataset_svm import DataSet
 from fnc_1_baseline_master.utils.generate_test_splits import kfold_split, get_stances_for_folds
@@ -20,7 +20,7 @@ def generate_features(stances,dataset,name):
         b.append(dataset.articles[stance['Body ID']])
 
     # Get LIWC lexicons
-    liwc_lex = LIWC_lexicons()
+    liwc_lex = LIWC_lexicons('2015')
 
     X_overlap = gen_or_load_feats(word_overlap_features, h, b, "fnc_1_baseline_master/features/overlap."+name+".npy")
     X_refuting = gen_or_load_feats(refuting_features, h, b, "fnc_1_baseline_master/features/refuting."+name+".npy")

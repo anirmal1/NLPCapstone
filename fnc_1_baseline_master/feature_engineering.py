@@ -4,7 +4,7 @@ import nltk
 import numpy as np
 from sklearn import feature_extraction
 from tqdm import tqdm
-
+from LIWC.LIWCutil import parse_liwc, reverse_dict
 
 _wnl = nltk.WordNetLemmatizer()
 
@@ -35,7 +35,12 @@ def gen_or_load_feats(feat_fn, headlines, bodies, feature_file):
 
     return np.load(feature_file)
 
+def gen_or_load_feats_liwc(feat_fn, lexicon_list, headlines, bodies, feature_file):
+    if not os.path.isfile(feature_file):
+        feats = feat_fn(lexicon_list, headlines, bodies)
+        np.save(feature_file, feats)
 
+    return np.load(feature_file)
 
 
 def word_overlap_features(headlines, bodies):
@@ -113,6 +118,42 @@ def discuss_features(headlines, bodies):
     def calculate_discuss(text):
         tokens = get_tokenized_lemmas(text)
         return sum([t in _discuss_words for t in tokens]) % 2
+    X = []
+    for i, (headline, body) in tqdm(enumerate(zip(headlines, bodies))):
+        clean_headline = clean(headline)
+        clean_body = clean(body)
+        features = []
+        features.append(calculate_discuss(clean_headline))
+        features.append(calculate_discuss(clean_body))
+        X.append(features)
+    return np.array(X)
+
+# Returns dictionary of category = words we want
+def LIWC_lexicons(w):
+    d = parse_liwc(w)
+    rev_d = reverse_dict(d)
+    short_dict = {}
+    short_dict['pronoun'] = rev_d['pronoun']
+    short_dict['anger'] = rev_d['anger']
+    short_dict['anx'] = rev_d['anx']
+    short_dict['pronoun'] = rev_d['negate']
+    short_dict['quant'] = rev_d['quant']
+    return short_dict
+
+def reg_counts(lexicon_list, headlines, bodies):
+    X = []
+    for i, (headline, body) in tqdm(enumerate(zip(headlines, bodies))):
+        clean_headline = clean(headline)
+        clean_headline = get_tokenized_lemmas(clean_headline)
+        features = [1 if word in clean_headline else 0 for word in lexicon_list]
+        X.append(features)
+    return X
+
+def overlap_counts(lexicon_list, headlines, bodies):
+
+    def calculate_discuss(text):
+        tokens = get_tokenized_lemmas(text)
+        return sum([t in lexicon_list for t in tokens]) % 2
     X = []
     for i, (headline, body) in tqdm(enumerate(zip(headlines, bodies))):
         clean_headline = clean(headline)
@@ -219,6 +260,8 @@ def hand_features(headlines, bodies):
         X.append(binary_co_occurence(headline, body)
                  + binary_co_occurence_stops(headline, body)
                  + count_grams(headline, body))
-
-
     return X
+
+if __name__ == '__main__':
+   pass
+   #print(LIWC_lexicons('2015'))

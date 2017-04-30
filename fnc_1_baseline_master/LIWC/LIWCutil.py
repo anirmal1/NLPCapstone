@@ -10,7 +10,7 @@ from random import shuffle
 
 LIWC_FILES = {
   "2007": "LIWC2007_English100131.dic",
-  "2015": "LIWC2015_English.dic",
+  "2015": "LIWC/LIWC2015_English.dic",
 }
 CAT_DELIM = "%"
 

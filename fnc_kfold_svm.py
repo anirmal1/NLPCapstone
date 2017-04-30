@@ -4,13 +4,12 @@ import numpy as np
 from sklearn.ensemble import GradientBoostingClassifier
 from sklearn import svm
 from fnc_1_baseline_master.feature_engineering import discuss_features, refuting_features, polarity_features, hand_features, gen_or_load_feats
-from fnc_1_baseline_master.feature_engineering import word_overlap_features
+from fnc_1_baseline_master.feature_engineering import word_overlap_features, LIWC_lexicons
 from fnc_1_baseline_master.utils.dataset_svm import DataSet
 from fnc_1_baseline_master.utils.generate_test_splits import kfold_split, get_stances_for_folds
 from fnc_1_baseline_master.utils.score import report_score, LABELS, score_submission
-
 from fnc_1_baseline_master.utils.system import parse_params, check_version
-
+from fnc_1_baseline_master.LIWC.LIWCutil import extract, reverse_dict
 
 def generate_features(stances,dataset,name):
     h, b, y = [],[],[]
@@ -20,13 +19,17 @@ def generate_features(stances,dataset,name):
         h.append(stance['Headline'])
         b.append(dataset.articles[stance['Body ID']])
 
+    # Get LIWC lexicons
+    liwc_lex = LIWC_lexicons()
+
     X_overlap = gen_or_load_feats(word_overlap_features, h, b, "fnc_1_baseline_master/features/overlap."+name+".npy")
     X_refuting = gen_or_load_feats(refuting_features, h, b, "fnc_1_baseline_master/features/refuting."+name+".npy")
     X_polarity = gen_or_load_feats(polarity_features, h, b, "fnc_1_baseline_master/features/polarity."+name+".npy")
     X_hand = gen_or_load_feats(hand_features, h, b, "fnc_1_baseline_master/features/hand."+name+".npy")
     X_discuss = gen_or_load_feats(discuss_features, h, b, "fnc_1_baseline_master/features/discuss."+name+".npy")
-
-    X = np.c_[X_discuss, X_hand, X_polarity, X_refuting, X_overlap]
+    X_pronoun = gen_or_load_feats_liwc(reg_counts, liwc_lex['pronoun'], h, b, "fnc_1_baseline_master/features/pronoun_reg."+name+".npy")
+ 
+    X = np.c_[X_pronoun, X_discuss, X_hand, X_polarity, X_refuting, X_overlap]
     return X,y
 
 if __name__ == "__main__":

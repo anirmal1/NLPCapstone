@@ -107,6 +107,21 @@ def polarity_features(headlines, bodies):
         X.append(features)
     return np.array(X)
 
+def discuss_features(headlines, bodies):
+    _discuss_words = ['according', 'maybe', 'reporting', 'reports', 'say', 'says', 'claim', 'claims', 'purportedly', 'investigating', 'told', 'tells', 'allegedly', 'validate', 'verify']
+
+    def calculate_discuss(text):
+        tokens = get_tokenized_lemmas(text)
+        return sum([t in _discuss_words for t in tokens]) % 2
+    X = []
+    for i, (headline, body) in tqdm(enumerate(zip(headlines, bodies))):
+        clean_headline = clean(headline)
+        clean_body = clean(body)
+        features = []
+        features.append(calculate_discuss(clean_headline))
+        features.append(calculate_discuss(clean_body))
+        X.append(features)
+    return np.array(X)
 
 def ngrams(input, n):
     input = input.split(' ')

@@ -3,7 +3,7 @@ import numpy as np
 
 from sklearn.ensemble import GradientBoostingClassifier
 from sklearn import svm
-from fnc_1_baseline_master.feature_engineering import refuting_features, polarity_features, hand_features, gen_or_load_feats
+from fnc_1_baseline_master.feature_engineering import discuss_features, refuting_features, polarity_features, hand_features, gen_or_load_feats
 from fnc_1_baseline_master.feature_engineering import word_overlap_features
 from fnc_1_baseline_master.utils.dataset_svm import DataSet
 from fnc_1_baseline_master.utils.generate_test_splits import kfold_split, get_stances_for_folds
@@ -24,8 +24,9 @@ def generate_features(stances,dataset,name):
     X_refuting = gen_or_load_feats(refuting_features, h, b, "fnc_1_baseline_master/features/refuting."+name+".npy")
     X_polarity = gen_or_load_feats(polarity_features, h, b, "fnc_1_baseline_master/features/polarity."+name+".npy")
     X_hand = gen_or_load_feats(hand_features, h, b, "fnc_1_baseline_master/features/hand."+name+".npy")
+    X_discuss = gen_or_load_feats(discuss_features, h, b, "fnc_1_baseline_master/features/discuss."+name+".npy")
 
-    X = np.c_[X_hand, X_polarity, X_refuting, X_overlap]
+    X = np.c_[X_discuss, X_hand, X_polarity, X_refuting, X_overlap]
     return X,y
 
 if __name__ == "__main__":

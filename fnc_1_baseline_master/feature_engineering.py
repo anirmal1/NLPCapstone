@@ -4,7 +4,7 @@ import nltk
 import numpy as np
 from sklearn import feature_extraction
 from tqdm import tqdm
-from LIWC.LIWCutil import parse_liwc, reverse_dict
+from fnc_1_baseline_master.LIWC.LIWCutil import parse_liwc, reverse_dict
 
 _wnl = nltk.WordNetLemmatizer()
 

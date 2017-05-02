@@ -28,9 +28,12 @@ def generate_features(stances,dataset,name):
     X_hand = gen_or_load_feats(hand_features, h, b, "fnc_1_baseline_master/features/hand."+name+".npy")
     X_discuss = gen_or_load_feats(discuss_features, h, b, "fnc_1_baseline_master/features/discuss."+name+".npy")
     # X_pronoun = gen_or_load_feats_liwc(reg_counts, liwc_lex['pronoun'], h, b, "fnc_1_baseline_master/features/pronoun_reg."+name+".npy")
-    X_anx = gen_or_load_feats_liwc(reg_counts, liwc_lex['anx'], h, b, "fnc_1_baseline_master/features/anx_reg."+name+".npy")
- 
-    X = np.c_[X_anx, X_discuss, X_hand, X_polarity, X_refuting, X_overlap]
+    # X_anx = gen_or_load_feats_liwc(reg_counts, liwc_lex['anx'], h, b, "fnc_1_baseline_master/features/anx_reg."+name+".npy")
+    # X_anger = gen_or_load_feats_liwc(reg_counts, liwc_lex['anger'], h, b,  "fnc_1_baseline_master/features/anger_reg."+name+".npy") 
+    # X_negate = gen_or_load_feats_liwc(reg_counts, liwc_lex['negate'], h, b, 'fnc_1_baseline_master/features/negate_reg.'+name+'.npy')
+    X_quant = gen_or_load_feats_liwc(reg_counts, liwc_lex['quant'], h, b, 'fnc_1_baseline_master/features/quant_reg.'+name+'.npy')
+
+    X = np.c_[X_quant, X_discuss, X_hand, X_polarity, X_refuting, X_overlap]
     return X,y
 
 if __name__ == "__main__":

@@ -136,7 +136,7 @@ def LIWC_lexicons(w):
     short_dict['pronoun'] = rev_d['pronoun']
     short_dict['anger'] = rev_d['anger']
     short_dict['anx'] = rev_d['anx']
-    short_dict['pronoun'] = rev_d['negate']
+    short_dict['negate'] = rev_d['negate']
     short_dict['quant'] = rev_d['quant']
     return short_dict
 

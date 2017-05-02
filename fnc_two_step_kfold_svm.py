@@ -154,6 +154,7 @@ if __name__ == "__main__":
         predicted_2 = clf2.predict([X_holdout[i]])
         predicted.append(predicted_2)
 
+    predicted = [LABELS[int(a)] for a in predicted]
     actual = [LABELS[int(a)] for a in y_holdout]
 
     report_score(actual,predicted)

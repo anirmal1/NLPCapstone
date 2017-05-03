@@ -5,9 +5,11 @@ import numpy as np
 from sklearn import feature_extraction
 from tqdm import tqdm
 from fnc_1_baseline_master.LIWC.LIWCutil import parse_liwc, reverse_dict
+from nltk.sentiment import SentimentIntensityAnalyzer
+import math
 
 _wnl = nltk.WordNetLemmatizer()
-
+_sia = SentimentIntensityAnalyzer()
 
 def normalize_word(w):
     return _wnl.lemmatize(w).lower() #_wnl.lemmatize(w.decode('utf-8')).lower()
@@ -27,6 +29,14 @@ def remove_stopwords(l):
     # Removes stopwords from a list of tokens
     return [w for w in l if w not in feature_extraction.text.ENGLISH_STOP_WORDS]
 
+def get_sentiment_difference(headlines, bodies):
+    X = []
+    for i in range(len(headlines)):
+        h_sentiment = _sia.polarity_scores(headlines[i])
+        b_sentiment = _sia.polarity_scores(bodies[i])
+        x = [math.fabs(h_sentiment['compound'] - b_sentiment['compound']), math.fabs(h_sentiment['neu'] - b_sentiment['neu']), math.fabs(h_sentiment['pos'] - b_sentiment['pos']), math.fabs(h_sentiment['neg'] - b_sentiment['neg'])]
+        X.append(x)
+    return X
 
 def gen_or_load_feats(feat_fn, headlines, bodies, feature_file):
     if not os.path.isfile(feature_file):

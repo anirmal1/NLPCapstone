@@ -3,6 +3,7 @@ import numpy as np
 
 from sklearn.ensemble import GradientBoostingClassifier
 from sklearn import svm
+from sklearn import metrics
 from fnc_1_baseline_master.feature_engineering import reg_counts, discuss_features, refuting_features, polarity_features, hand_features, gen_or_load_feats
 from fnc_1_baseline_master.feature_engineering import word_overlap_features, LIWC_lexicons, gen_or_load_feats_liwc
 from fnc_1_baseline_master.utils.dataset_svm import DataSet
@@ -76,7 +77,16 @@ if __name__ == "__main__":
 
         predicted = [LABELS[int(a)] for a in clf.predict(X_test)]
         actual = [LABELS[int(a)] for a in y_test]
+        
+	# Mean F1 score per fold
+        f1_score = metrics.f1_score(actual, predicted, average='macro')
+        print("F1 MEAN score for fold " + str(fold) + " was - " + str(f1_score))
 
+        # F1 score each label
+        f1_score_labels = metrics.f1_score(actual, predicted, labels=LABELS, average=None)
+        print("F1 LABEL score for fold " + str(fold) + " was - " + str(f1_score_labels))
+        
+	# FNC scoring metric
         fold_score, _ = score_submission(actual, predicted)
         max_fold_score, _ = score_submission(actual, actual)
 
@@ -88,9 +98,11 @@ if __name__ == "__main__":
             best_fold = clf
 
 
-
     #Run on Holdout set and report the final score on the holdout set
     predicted = [LABELS[int(a)] for a in best_fold.predict(X_holdout)]
     actual = [LABELS[int(a)] for a in y_holdout]
 
+    f1_score = metrics.f1_score(actual, predicted, average='macro')
+    print("F1 MEAN score overall " + str(fold) + " was - " + str(f1_score))
+    
     report_score(actual,predicted)

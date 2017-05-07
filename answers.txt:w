@@ -96,7 +96,8 @@ USE_LSTM = True
 inputs_articles = tf.placeholder(tf.float32, (None, 200, INPUT_SIZE))  # (batch, time, in)
 inputs_headlines = tf.placeholder(tf.float32, (None, None, INPUT_SIZE))
 
-outputs = tf.placeholder(tf.float32, (None, None, OUTPUT_SIZE)) # (batch, time, out)
+outputs_articles = tf.placeholder(tf.float32, (None, 1, OUTPUT_SIZE)) # (batch, time, out)
+outputs_headlines = tf.placeholder(tf.float32, (None, None, OUTPUT_SIZE))
 
 ## Here cell can be any function you want, provided it has two attributes:
 #     - cell.zero_state(batch_size, dtype)- tensor which is an initial value
@@ -127,11 +128,10 @@ initial_state = cell.zero_state(batch_size, tf.float32)
 #  - outputs: (time, batch, output_size)  [do not mistake with OUTPUT_SIZE]
 #  - states:  (time, batch, hidden_size)
 rnn_outputs_articles, rnn_states_articles = tf.nn.dynamic_rnn(cell_articles, inputs_articles, initial_state=initial_state, time_major=False)
-
 rnn_outputs_headlines, rnn_states_headlines = tf.nn.dynamic_rnn(cell_headlines, inputs_headlines, initial_state=initial_state, time_major=False)
 
-# Concatenate articles and headlines rnn_outputs
-rnn_outputs = tf.concat([rnn_outputs_articles, rnn_outputs_headlines], 0)
+# Reshape output tensor
+#rnn_outputs_reshaped = tf.reshape(rnn_outputs, [200, -1])
 
 # project output from rnn output size to OUTPUT_SIZE. Sometimes it is worth adding
 # an extra layer here.
@@ -190,22 +190,17 @@ for epoch in range(1000):
         # own do not trigger the backprop.
         # x, y = generate_batch(num_bits=NUM_BITS, batch_size=BATCH_SIZE)
         # TODO replace above line with getting feature vectors for current batch
-        x_articles = x_articles[fold]
-        x_headlines = x_headlines[fold]
-	y = y_vals[fold]
+        x = x_articles[fold]
+        y = y_vals[fold]
         
         epoch_error += session.run([error, train_fn], {
-            inputs_articles: x_articles,
-	    inputs_headlines: x_headlines
+            inputs: x,
             outputs: y,
         })[0]
-        
+    
     epoch_error /= len(x_vals) #len(fold_stances) # ITERATIONS_PER_EPOCH
-    
     valid_accuracy = session.run(accuracy, {
-        inputs_articles:  valid_x_articles,
-        inputs_headlines: valid_x_headlines,
-	outputs: valid_y,
+        inputs:  valid_x_articles,
+        outputs: valid_y,
     })
-    
     print ("Epoch %d, train error: %.2f, valid accuracy: %.1f %%" % (epoch, epoch_error, valid_accuracy * 100.0))

@@ -23,12 +23,12 @@ import random
 import tensorflow as tf
 import tensorflow.contrib.layers as layers
 from word_embeddings import WordEmbeddings
+from sklearn import metrics
 from fnc_1_baseline_master.utils.dataset import DataSet
 from fnc_1_baseline_master.utils.generate_test_splits import kfold_split, get_stances_for_folds
 from fnc_1_baseline_master.feature_engineering import refuting_features, polarity_features, hand_features, gen_or_load_feats
 from fnc_1_baseline_master.feature_engineering import word_overlap_features
 from fnc_1_baseline_master.utils.score import report_score, LABELS, score_submission
-
 from fnc_1_baseline_master.utils.system import parse_params, check_version
 
 ################################################################################
@@ -87,7 +87,7 @@ def generate_features(stances,dataset,name):
 
 INPUT_SIZE    = 100 #2       # 2 bits per timestep
 RNN_HIDDEN    = 10
-OUTPUT_SIZE   = 1       # 1 bit per timestep
+OUTPUT_SIZE   = 4       # 1 bit per timestep
 TINY          = 1e-6    # to avoid NaNs in logs
 LEARNING_RATE = 0.01
 
@@ -111,8 +111,26 @@ outputs = tf.placeholder(tf.float32, (None, None, OUTPUT_SIZE)) # (batch, time, 
 # Example LSTM cell with learnable zero_state can be found here:
 #    https://gist.github.com/nivwusquorum/160d5cf7e1e82c21fad3ebf04f039317
 if USE_LSTM:
-    cell_articles = tf.contrib.rnn.BasicLSTMCell(RNN_HIDDEN, state_is_tuple=True)
-    cell_headlines = tf.contrib.rnn.BasicLSTMCell(RNN_HIDDEN, state_is_tuple=True) 
+    #cell_articles = tf.contrib.rnn.BasicLSTMCell(RNN_HIDDEN, state_is_tuple=True)
+    #cell_headlines = tf.contrib.rnn.BasicLSTMCell(RNN_HIDDEN, state_is_tuple=True) 
+
+    with tf.variable_scope('scope1') as scope1:  
+        # Create cell
+        cell_articles = tf.contrib.rnn.BasicLSTMCell(RNN_HIDDEN, state_is_tuple=True)
+        # Initialize batch size, initial states
+        batch_size_articles= tf.shape(inputs_articles)[0]
+        initial_state_articles = cell_articles.zero_state(batch_size_articles, tf.float32)
+        # Hidden states, outputs
+        rnn_outputs_articles, rnn_states_articles = tf.nn.dynamic_rnn(cell_articles, inputs_articles, initial_state=initial_state_articles, time_major=False)
+    with tf.variable_scope('scope1') as scope1:
+        scope1.reuse_variables() 
+        # Create cell
+        cell_headlines = tf.contrib.rnn.BasicLSTMCell(RNN_HIDDEN, state_is_tuple=True) 
+        # Initialize batch size, initial states
+        batch_size_headlines= tf.shape(inputs_headlines)[0]
+        initial_state_headlines = cell_headlines.zero_state(batch_size_headlines, tf.float32)
+        # Hidden states, outputs
+        rnn_outputs_headlines, rnn_states_headlines = tf.nn.dynamic_rnn(cell_headlines, inputs_headlines, initial_state=initial_state_headlines, time_major=False)
 else:
     cell = tf.nn.rnn_cell.BasicRNNCell(RNN_HIDDEN)
 
@@ -120,18 +138,19 @@ else:
 # but in principle it could be a learnable parameter. This is a bit tricky
 # to do for LSTM's tuple state, but can be achieved by creating two vector
 # Variables, which are then tiled along batch dimension and grouped into tuple.
-batch_size    = tf.shape(inputs)[0]
-initial_state = cell.zero_state(batch_size, tf.float32)
+'''batch_size_articles= tf.shape(inputs_articles)[0]
+initial_state_articles = cell_articles.zero_state(batch_size_articles, tf.float32)
+batch_size_headlines= tf.shape(inputs_headlines)[0]
+initial_state_headlines = cell_headlines.zero_state(batch_size_headlines, tf.float32)'''
 
 # Given inputs (time, batch, input_size) outputs a tuple
 #  - outputs: (time, batch, output_size)  [do not mistake with OUTPUT_SIZE]
 #  - states:  (time, batch, hidden_size)
-rnn_outputs_articles, rnn_states_articles = tf.nn.dynamic_rnn(cell_articles, inputs_articles, initial_state=initial_state, time_major=False)
-
-rnn_outputs_headlines, rnn_states_headlines = tf.nn.dynamic_rnn(cell_headlines, inputs_headlines, initial_state=initial_state, time_major=False)
+'''rnn_outputs_articles, rnn_states_articles = tf.nn.dynamic_rnn(cell_articles, inputs_articles, initial_state=initial_state_articles, time_major=False)
+rnn_outputs_headlines, rnn_states_headlines = tf.nn.dynamic_rnn(cell_headlines, inputs_headlines, initial_state=initial_state_headlines, time_major=False)'''
 
 # Concatenate articles and headlines rnn_outputs
-rnn_outputs = tf.concat([rnn_outputs_articles, rnn_outputs_headlines], 0)
+rnn_outputs = tf.concat([rnn_outputs_articles, rnn_outputs_headlines], 1)
 
 # project output from rnn output size to OUTPUT_SIZE. Sometimes it is worth adding
 # an extra layer here.
@@ -139,6 +158,10 @@ final_projection = lambda x: layers.linear(x, num_outputs=OUTPUT_SIZE, activatio
 
 # apply projection to every timestep.
 predicted_outputs = tf.map_fn(final_projection, rnn_outputs)
+
+# Take softmax, Get predicted label
+softmaxes = tf.nn.softmax(predicted_outputs)
+pred_stance = tf.argmax(softmaxes, 1)
 
 # compute elementwise cross entropy.
 error = -(outputs * tf.log(predicted_outputs + TINY) + (1.0 - outputs) * tf.log(1.0 - predicted_outputs + TINY))
@@ -183,29 +206,35 @@ session = tf.Session()
 # For some reason it is our job to do this:
 session.run(tf.global_variables_initializer())
 
-for epoch in range(1000):
+for epoch in range(10):
     epoch_error = 0
-    for fold in x_vals:  #for _ in range(ITERATIONS_PER_EPOCH):
+    for fold in fold_stances:  #for _ in range(ITERATIONS_PER_EPOCH):
         # here train_fn is what triggers backprop. error and accuracy on their
         # own do not trigger the backprop.
         # x, y = generate_batch(num_bits=NUM_BITS, batch_size=BATCH_SIZE)
         # TODO replace above line with getting feature vectors for current batch
         x_articles = x_articles[fold]
         x_headlines = x_headlines[fold]
-	      y = y_vals[fold]
+        y = y_vals[fold]
         
         epoch_error += session.run([error, train_fn], {
             inputs_articles: x_articles,
-	          inputs_headlines: x_headlines
+	    inputs_headlines: x_headlines,
             outputs: y,
         })[0]
         
     epoch_error /= len(x_vals) #len(fold_stances) # ITERATIONS_PER_EPOCH
     
-    valid_accuracy = session.run(accuracy, {
+    valid_accuracy, pred_y_stances = session.run([accuracy, pred_stance], {
         inputs_articles:  valid_x_articles,
         inputs_headlines: valid_x_headlines,
-	      outputs: valid_y,
+	outputs: valid_y,
     })
     
     print ("Epoch %d, train error: %.2f, valid accuracy: %.1f %%" % (epoch, epoch_error, valid_accuracy * 100.0))
+    
+    f1_score = metrics.f1_score(valid_y, pred_y_stances, average='macro')
+    print("F1 MEAN score: " + str(f1_score))
+    
+    f1_score_labels =  metrics.f1_score(valid_y, pred_y_stances, labels=LABELS, average=None)
+    print("F1 LABEL scores: " + str(f1_score_labels))

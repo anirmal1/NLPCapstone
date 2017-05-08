@@ -192,11 +192,11 @@ for epoch in range(1000):
         # TODO replace above line with getting feature vectors for current batch
         x_articles = x_articles[fold]
         x_headlines = x_headlines[fold]
-	y = y_vals[fold]
+	      y = y_vals[fold]
         
         epoch_error += session.run([error, train_fn], {
             inputs_articles: x_articles,
-	    inputs_headlines: x_headlines
+	          inputs_headlines: x_headlines
             outputs: y,
         })[0]
         
@@ -205,7 +205,7 @@ for epoch in range(1000):
     valid_accuracy = session.run(accuracy, {
         inputs_articles:  valid_x_articles,
         inputs_headlines: valid_x_headlines,
-	outputs: valid_y,
+	      outputs: valid_y,
     })
     
     print ("Epoch %d, train error: %.2f, valid accuracy: %.1f %%" % (epoch, epoch_error, valid_accuracy * 100.0))

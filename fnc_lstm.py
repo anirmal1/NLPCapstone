@@ -127,7 +127,7 @@ if USE_LSTM:
     with tf.variable_scope('scope1') as scope1:
         scope1.reuse_variables() 
         # Create cell
-        cell_headlines = tf.contrib.rnn.BasicLSTMCell(RNN_HIDDEN, state_is_tuple=True) 
+        cell_headlines = tf.contrib.rnn.BasicLSTMCell(RNN_HIDDEN, state_is_tuple=True, reuse=True) 
         # Initialize batch size, initial states
         batch_size_headlines= tf.shape(inputs_headlines)[0]
         initial_state_headlines = cell_headlines.zero_state(batch_size_headlines, tf.float32)

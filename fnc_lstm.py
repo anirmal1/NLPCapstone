@@ -38,7 +38,8 @@ def get_articles_word_vectors(stances, dataset, word_embeddings):
     b, y, h = [], [], []  # bodies, true labels, headlines
     
     for stance in stances:
-        y.append([[LABELS.index(stance['Stance'])]])
+        #y.append([[LABELS.index(stance['Stance'])]])
+        y.append(np.array([np.array([LABELS.index(stance['Stance'])])]))
         h.append(stance['Headline'])
         b.append(dataset.articles[stance['Body ID']])
 
@@ -85,9 +86,10 @@ def generate_features(stances,dataset,name):
 ##                           GRAPH DEFINITION                                 ##
 ################################################################################
 
-INPUT_SIZE    = 100 #2       # 2 bits per timestep
+INPUT_SIZE    = 100 # Length of GLoVe word embeddings (100d)
 RNN_HIDDEN    = 10
-OUTPUT_SIZE   = 4       # 1 bit per timestep
+OUTPUT_SIZE   = 1       # Final output (label)
+HIDDEN_OUTPUT_SIZE = 4 # Softmax over all four labels
 TINY          = 1e-6    # to avoid NaNs in logs
 LEARNING_RATE = 0.01
 
@@ -154,7 +156,7 @@ rnn_outputs = tf.concat([rnn_outputs_articles, rnn_outputs_headlines], 1)
 
 # project output from rnn output size to OUTPUT_SIZE. Sometimes it is worth adding
 # an extra layer here.
-final_projection = lambda x: layers.linear(x, num_outputs=OUTPUT_SIZE, activation_fn=tf.nn.sigmoid)
+final_projection = lambda x: layers.linear(x, num_outputs=HIDDEN_OUTPUT_SIZE, activation_fn=tf.nn.sigmoid)
 
 # apply projection to every timestep.
 predicted_outputs = tf.map_fn(final_projection, rnn_outputs)
@@ -216,11 +218,12 @@ for epoch in range(10):
         x_articles = x_articles[fold]
         x_headlines = x_headlines[fold]
         y = y_vals[fold]
-        
+        print(y)
+
         epoch_error += session.run([error, train_fn], {
             inputs_articles: x_articles,
 	    inputs_headlines: x_headlines,
-            outputs: y,
+            outputs: y
         })[0]
         
     epoch_error /= len(x_vals) #len(fold_stances) # ITERATIONS_PER_EPOCH
@@ -228,7 +231,7 @@ for epoch in range(10):
     valid_accuracy, pred_y_stances = session.run([accuracy, pred_stance], {
         inputs_articles:  valid_x_articles,
         inputs_headlines: valid_x_headlines,
-	outputs: valid_y,
+	outputs: valid_y
     })
     
     print ("Epoch %d, train error: %.2f, valid accuracy: %.1f %%" % (epoch, epoch_error, valid_accuracy * 100.0))

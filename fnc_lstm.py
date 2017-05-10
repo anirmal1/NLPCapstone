@@ -231,16 +231,19 @@ for epoch in range(10):
         
 	# epoch_error /= len(fold_stances) # ITERATIONS_PER_EPOCH
     
-	valid_accuracy, pred_y_stances = session.run([accuracy, pred_stance], {
+	valid_accuracy, pred_y_stances, softs = session.run([accuracy, pred_stance, softmaxes], {
 		inputs_articles:  valid_x_articles,
 		inputs_headlines: valid_x_headlines,
 		outputs: valid_y
 	})
 
+	print(pred_y_stances)
+	print(softs)
+
 	print ("Epoch %d, train error: %.2f, valid accuracy: %.1f %%" % (epoch, epoch_error, valid_accuracy * 100.0))
 	
 	# <uncomment this to look try f1 scores (currently breaks tho)>
-	# f1_score = metrics.f1_score(valid_y, pred_y_stances, average='macro')
+	f1_score = metrics.f1_score(valid_y, pred_y_stances, average='macro')
 	# print("F1 MEAN score: " + str(f1_score))
     
 	# f1_score_labels =  metrics.f1_score(valid_y, pred_y_stances, labels=LABELS, average=None)

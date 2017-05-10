@@ -164,8 +164,10 @@ final_projection = lambda x: layers.linear(x, num_outputs=HIDDEN_OUTPUT_SIZE, ac
 predicted_outputs = tf.map_fn(final_projection, rnn_outputs)
 
 # Take softmax, Get predicted label
-softmaxes = tf.nn.softmax(predicted_outputs)
+softmaxes = tf.nn.softmax(predicted_outputs[0:, -1, 0:]) #tf.nn.softmax(predicted_outputs)
 pred_stance = tf.argmax(softmaxes, 1)
+#ipred_array = np.zeros(4)
+#pred_array[LABELS.index(pred_stance)] = 1
 
 # compute elementwise cross entropy.
 error = -(outputs * tf.log(predicted_outputs + TINY) + (1.0 - outputs) * tf.log(1.0 - predicted_outputs + TINY))
@@ -205,6 +207,7 @@ for fold in fold_stances:
 
 valid_x_headlines, valid_x_articles, valid_y = get_articles_word_vectors(hold_out_stances, d, embeddings) # generate_features(hold_out_stances, d, "holdout")
 
+
 print ("Finished separating folds")
 
 session = tf.Session()
@@ -231,20 +234,24 @@ for epoch in range(10):
         
 	# epoch_error /= len(fold_stances) # ITERATIONS_PER_EPOCH
     
-	valid_accuracy, pred_y_stances, softs = session.run([accuracy, pred_stance, softmaxes], {
+	valid_accuracy, pred_y_stances = session.run([accuracy, pred_stance], {
 		inputs_articles:  valid_x_articles,
 		inputs_headlines: valid_x_headlines,
 		outputs: valid_y
 	})
 
+	simple_y = np.array([array[0].tolist().index(1) for array in valid_y])
+	print(simple_y)
+	print(simple_y.shape)
+	print(simple_y.dtype)
 	print(pred_y_stances)
-	print(softs)
-
+	print(pred_y_stances.shape)
+	print(pred_y_stances.dtype)
 	print ("Epoch %d, train error: %.2f, valid accuracy: %.1f %%" % (epoch, epoch_error, valid_accuracy * 100.0))
 	
 	# <uncomment this to look try f1 scores (currently breaks tho)>
-	f1_score = metrics.f1_score(valid_y, pred_y_stances, average='macro')
-	# print("F1 MEAN score: " + str(f1_score))
+	f1_score = metrics.f1_score(valid_y, simple_y, average=None)
+	print("F1 MEAN score: " + str(f1_score))
     
 	# f1_score_labels =  metrics.f1_score(valid_y, pred_y_stances, labels=LABELS, average=None)
 	# print("F1 LABEL scores: " + str(f1_score_labels))

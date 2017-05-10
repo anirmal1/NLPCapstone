@@ -36,13 +36,11 @@ from fnc_1_baseline_master.utils.system import parse_params, check_version
 ################################################################################
 def get_articles_word_vectors(stances, dataset, word_embeddings):
 	b, y, h = [], [], []  # bodies, true labels, headlines
-    
 	for stance in stances:
 		#y.append([[LABELS.index(stance['Stance'])]])
 		zeros = np.zeros(4)
 		zeros[LABELS.index(stance['Stance'])] = 1
 		y.append(np.array([zeros]))
-		# y.append(np.array([LABELS.index(stance['Stance'])]))
 		h.append(stance['Headline'])
 		b.append(dataset.articles[stance['Body ID']])
 
@@ -57,9 +55,6 @@ def get_articles_word_vectors(stances, dataset, word_embeddings):
 			embeddings_list.append(article)
 			headline_embeddings_list.append(headline)
 			ys.append(y_val)
-			# print(np.array(headline_embeddings_list).ndim) headline_embeddings_list.append(headline)
-    #print(np.array(embeddings_list).ndim)
-    #print(np.array(headline_embeddings_list).ndim)
 
 	return np.array(headline_embeddings_list), np.array(embeddings_list), np.array(ys, dtype=np.float32) # TODO how do you properly return the embeddings in 3 dimensions?? :(
     
@@ -217,37 +212,39 @@ session = tf.Session()
 session.run(tf.global_variables_initializer())
 
 for epoch in range(10):
-    epoch_error = 0
-    for fold in fold_stances:  #for _ in range(ITERATIONS_PER_EPOCH):
+	epoch_error = 0
+	for fold in fold_stances:
+	# for fold in range(1): #for fold in fold_stances: <uncomment this to iterate through folds--currently breaks tho for more than 1:(>
         # here train_fn is what triggers backprop. error and accuracy on their
         # own do not trigger the backprop.
         # x, y = generate_batch(num_bits=NUM_BITS, batch_size=BATCH_SIZE)
         # TODO replace above line with getting feature vectors for current batch
-        x_articles = x_articles[fold]
-        x_headlines = x_headlines[fold]
-        y = y_vals[fold]
-        print('Y shape = ' + str(y.shape))
-        print('X articles shape = ' + str(x_articles.shape))
-        print('X headlines shape = ' + str(x_headlines.shape))
+		x_articles = x_articles[fold]
+		x_headlines = x_headlines[fold]
+		y = y_vals[fold]
+		print('Y shape = ' + str(y.shape))
+		print('X articles shape = ' + str(x_articles.shape))
+		print('X headlines shape = ' + str(x_headlines.shape))
 
-        epoch_error += session.run([error, train_fn], {
+		epoch_error += session.run([error, train_fn], {
             inputs_articles: x_articles,
-						inputs_headlines: x_headlines,
+			inputs_headlines: x_headlines,
             outputs: y
-        })[0]
+		})[0]
         
-    epoch_error /= len(fold_stances) # ITERATIONS_PER_EPOCH
+	# epoch_error /= len(fold_stances) # ITERATIONS_PER_EPOCH
     
-    valid_accuracy, pred_y_stances = session.run([accuracy, pred_stance], {
+	valid_accuracy, pred_y_stances = session.run([accuracy, pred_stance], {
         inputs_articles:  valid_x_articles,
         inputs_headlines: valid_x_headlines,
-	outputs: valid_y
-    })
+		outputs: valid_y
+	})
+
+	print ("Epoch %d, train error: %.2f, valid accuracy: %.1f %%" % (epoch, epoch_error, valid_accuracy * 100.0))
+	
+	# <uncomment this to look try f1 scores (currently breaks tho)>
+	# f1_score = metrics.f1_score(valid_y, pred_y_stances, average='macro')
+	# print("F1 MEAN score: " + str(f1_score))
     
-    print ("Epoch %d, train error: %.2f, valid accuracy: %.1f %%" % (epoch, epoch_error, valid_accuracy * 100.0))
-    
-    f1_score = metrics.f1_score(valid_y, pred_y_stances, average='macro')
-    print("F1 MEAN score: " + str(f1_score))
-    
-    f1_score_labels =  metrics.f1_score(valid_y, pred_y_stances, labels=LABELS, average=None)
-    print("F1 LABEL scores: " + str(f1_score_labels))
+	# f1_score_labels =  metrics.f1_score(valid_y, pred_y_stances, labels=LABELS, average=None)
+	# print("F1 LABEL scores: " + str(f1_score_labels))

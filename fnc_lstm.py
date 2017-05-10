@@ -35,25 +35,33 @@ from fnc_1_baseline_master.utils.system import parse_params, check_version
 ##                             WORD EMBEDDINGS                                ##
 ################################################################################
 def get_articles_word_vectors(stances, dataset, word_embeddings):
-    b, y, h = [], [], []  # bodies, true labels, headlines
+	b, y, h = [], [], []  # bodies, true labels, headlines
     
-    for stance in stances:
-        #y.append([[LABELS.index(stance['Stance'])]])
-        y.append(np.array([np.array([LABELS.index(stance['Stance'])])]))
-        h.append(stance['Headline'])
-        b.append(dataset.articles[stance['Body ID']])
+	for stance in stances:
+		#y.append([[LABELS.index(stance['Stance'])]])
+		zeros = np.zeros(4)
+		zeros[LABELS.index(stance['Stance'])] = 1
+		y.append(np.array([zeros]))
+		# y.append(np.array([LABELS.index(stance['Stance'])]))
+		h.append(stance['Headline'])
+		b.append(dataset.articles[stance['Body ID']])
 
-    embeddings_list = []
-    for article in b:
-       sentence_embedding = word_embeddings.get_embedding_for_sentence(article)
-       embeddings_list.append(sentence_embedding)
+	embeddings_list = []
+	headline_embeddings_list = []
+	ys = []
+	for i in range(len(b)):
+		article = word_embeddings.get_embedding_for_sentence(b[i])
+		headline = word_embeddings.get_embedding_for_headline(h[i]) # trying to get equal length headline #get_embedding_for_sentence(h[i])
+		y_val = y[i]
+		if article.ndim == 2 and headline.ndim == 2 and headline.shape[0] == 30 and headline.shape[1] == 100:
+			embeddings_list.append(article)
+			headline_embeddings_list.append(headline)
+			ys.append(y_val)
+			# print(np.array(headline_embeddings_list).ndim) headline_embeddings_list.append(headline)
+    #print(np.array(embeddings_list).ndim)
+    #print(np.array(headline_embeddings_list).ndim)
 
-    headline_embeddings_list = []
-    for headline in h:
-       embedding = word_embeddings.get_embedding_for_sentence(headline)
-       headline_embeddings_list.append(embedding)
-
-    return np.array(headline_embeddings_list), np.array(embeddings_list), y # TODO how do you properly return the embeddings in 3 dimensions?? :(
+	return np.array(headline_embeddings_list), np.array(embeddings_list), np.array(ys, dtype=np.float32) # TODO how do you properly return the embeddings in 3 dimensions?? :(
     
 
 
@@ -88,7 +96,7 @@ def generate_features(stances,dataset,name):
 
 INPUT_SIZE    = 100 # Length of GLoVe word embeddings (100d)
 RNN_HIDDEN    = 10
-OUTPUT_SIZE   = 1       # Final output (label)
+OUTPUT_SIZE   = 4       # Final output (label)
 HIDDEN_OUTPUT_SIZE = 4 # Softmax over all four labels
 TINY          = 1e-6    # to avoid NaNs in logs
 LEARNING_RATE = 0.01
@@ -218,15 +226,17 @@ for epoch in range(10):
         x_articles = x_articles[fold]
         x_headlines = x_headlines[fold]
         y = y_vals[fold]
-        print(y)
+        print('Y shape = ' + str(y.shape))
+        print('X articles shape = ' + str(x_articles.shape))
+        print('X headlines shape = ' + str(x_headlines.shape))
 
         epoch_error += session.run([error, train_fn], {
             inputs_articles: x_articles,
-	    inputs_headlines: x_headlines,
+						inputs_headlines: x_headlines,
             outputs: y
         })[0]
         
-    epoch_error /= len(x_vals) #len(fold_stances) # ITERATIONS_PER_EPOCH
+    epoch_error /= len(fold_stances) # ITERATIONS_PER_EPOCH
     
     valid_accuracy, pred_y_stances = session.run([accuracy, pred_stance], {
         inputs_articles:  valid_x_articles,

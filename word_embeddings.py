@@ -20,6 +20,19 @@ class WordEmbeddings():
 	def get_embedding_for_word(self, word):
 		return self.word_vector_map[word] if word in self.word_vector_map else None
 
+	def get_embedding_for_headline(self, sentence):
+		sentence = sentence.split()
+		vectorList = []
+		for i in range(30 - len(sentence)):
+			sentence.append(' ')
+		for i in range(30):
+			word = sentence[i]
+			if self.get_embedding_for_word(word) is not None:
+				vectorList.append(self.word_vector_map[word])
+			else:
+				vectorList.append(np.zeros(100)) # to address the dimensions issue (not sure if this is right tho)
+		return np.vstack(vectorList)
+
 	def get_embedding_for_sentence(self, sentence):
 		vectorList = []
 		for word in sentence:

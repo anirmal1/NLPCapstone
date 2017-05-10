@@ -118,26 +118,25 @@ outputs = tf.placeholder(tf.float32, (None, None, OUTPUT_SIZE)) # (batch, time, 
 if USE_LSTM:
     #cell_articles = tf.contrib.rnn.BasicLSTMCell(RNN_HIDDEN, state_is_tuple=True)
     #cell_headlines = tf.contrib.rnn.BasicLSTMCell(RNN_HIDDEN, state_is_tuple=True) 
-
-    with tf.variable_scope('scope1') as scope1:  
-        # Create cell
-        cell_articles = tf.contrib.rnn.BasicLSTMCell(RNN_HIDDEN, state_is_tuple=True)
-        # Initialize batch size, initial states
-        batch_size_articles= tf.shape(inputs_articles)[0]
-        initial_state_articles = cell_articles.zero_state(batch_size_articles, tf.float32)
-        # Hidden states, outputs
-        rnn_outputs_articles, rnn_states_articles = tf.nn.dynamic_rnn(cell_articles, inputs_articles, initial_state=initial_state_articles, time_major=False)
-    with tf.variable_scope('scope1') as scope1:
-        scope1.reuse_variables() 
-        # Create cell
-        cell_headlines = tf.contrib.rnn.BasicLSTMCell(RNN_HIDDEN, state_is_tuple=True, reuse=True) 
-        # Initialize batch size, initial states
-        batch_size_headlines= tf.shape(inputs_headlines)[0]
-        initial_state_headlines = cell_headlines.zero_state(batch_size_headlines, tf.float32)
-        # Hidden states, outputs
-        rnn_outputs_headlines, rnn_states_headlines = tf.nn.dynamic_rnn(cell_headlines, inputs_headlines, initial_state=initial_state_headlines, time_major=False)
+	with tf.variable_scope('scope1') as scope1:  
+		# Create cell
+		cell_articles = tf.contrib.rnn.BasicLSTMCell(RNN_HIDDEN, state_is_tuple=True)
+		# Initialize batch size, initial states
+		batch_size_articles= tf.shape(inputs_articles)[0]
+		initial_state_articles = cell_articles.zero_state(batch_size_articles, tf.float32)
+		# Hidden states, outputs
+		rnn_outputs_articles, rnn_states_articles = tf.nn.dynamic_rnn(cell_articles, inputs_articles, initial_state=initial_state_articles, time_major=False)
+	with tf.variable_scope('scope1') as scope1:
+		scope1.reuse_variables() 
+		# Create cell
+		cell_headlines = tf.contrib.rnn.BasicLSTMCell(RNN_HIDDEN, state_is_tuple=True, reuse=True) 
+		# Initialize batch size, initial states
+		batch_size_headlines= tf.shape(inputs_headlines)[0]
+		initial_state_headlines = cell_headlines.zero_state(batch_size_headlines, tf.float32)
+		# Hidden states, outputs
+		rnn_outputs_headlines, rnn_states_headlines = tf.nn.dynamic_rnn(cell_headlines, inputs_headlines, initial_state=initial_state_headlines, time_major=False)
 else:
-    cell = tf.nn.rnn_cell.BasicRNNCell(RNN_HIDDEN)
+	cell = tf.nn.rnn_cell.BasicRNNCell(RNN_HIDDEN)
 
 # Create initial state. Here it is just a constant tensor filled with zeros,
 # but in principle it could be a learnable parameter. This is a bit tricky
@@ -201,7 +200,8 @@ x_headlines = {}
 y_vals = {}
 
 for fold in fold_stances:
-  x_headlines[fold], x_articles[fold], y_vals[fold] = get_articles_word_vectors(fold_stances[fold], d, embeddings) # generate_features(fold_stances[fold], d, str(fold))
+	x_headlines[fold], x_articles[fold], y_vals[fold] = get_articles_word_vectors(fold_stances[fold], d, embeddings) # generate_features(fold_stances[fold], d, str(fold))
+
 
 valid_x_headlines, valid_x_articles, valid_y = get_articles_word_vectors(hold_out_stances, d, embeddings) # generate_features(hold_out_stances, d, "holdout")
 
@@ -219,24 +219,21 @@ for epoch in range(10):
         # own do not trigger the backprop.
         # x, y = generate_batch(num_bits=NUM_BITS, batch_size=BATCH_SIZE)
         # TODO replace above line with getting feature vectors for current batch
-		x_articles = x_articles[fold]
-		x_headlines = x_headlines[fold]
+		x_article_batch = x_articles[fold]
+		x_headline_batch = x_headlines[fold]
 		y = y_vals[fold]
-		print('Y shape = ' + str(y.shape))
-		print('X articles shape = ' + str(x_articles.shape))
-		print('X headlines shape = ' + str(x_headlines.shape))
 
 		epoch_error += session.run([error, train_fn], {
-            inputs_articles: x_articles,
-			inputs_headlines: x_headlines,
-            outputs: y
+			inputs_articles: x_article_batch,
+			inputs_headlines: x_headline_batch,
+      outputs: y
 		})[0]
         
 	# epoch_error /= len(fold_stances) # ITERATIONS_PER_EPOCH
     
 	valid_accuracy, pred_y_stances = session.run([accuracy, pred_stance], {
-        inputs_articles:  valid_x_articles,
-        inputs_headlines: valid_x_headlines,
+		inputs_articles:  valid_x_articles,
+		inputs_headlines: valid_x_headlines,
 		outputs: valid_y
 	})
 

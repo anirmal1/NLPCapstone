@@ -241,6 +241,7 @@ for epoch in range(10):
 	})
 
 	simple_y = np.array([array[0].tolist().index(1) for array in valid_y])
+	'''
 	print('True outputs: ' + str(simple_y))
 	print('Shape of true outputs: '+ str(simple_y.shape))
 	print('Type of true outputs: ' + str(simple_y.dtype))
@@ -248,9 +249,10 @@ for epoch in range(10):
 	print('Shape of predicted outputs: '+ str(pred_y_stances.shape))
 	print('Type of predicted outputs: ' + str(pred_y_stances.dtype))
 	print ("Epoch %d, train error: %.2f, valid accuracy: %.1f %%" % (epoch, epoch_error, valid_accuracy * 100.0))
-	
+	'''	
+
 	# <uncomment this to look try f1 scores (currently breaks tho)>
-	f1_score = metrics.f1_score(valid_y, simple_y, average=None)
+	f1_score = metrics.f1_score(simple_y, pred_y_stances, average=None)
 	print("F1 MEAN score: " + str(f1_score))
     
 	# f1_score_labels =  metrics.f1_score(valid_y, pred_y_stances, labels=LABELS, average=None)

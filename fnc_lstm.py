@@ -241,12 +241,12 @@ for epoch in range(10):
 	})
 
 	simple_y = np.array([array[0].tolist().index(1) for array in valid_y])
-	print(simple_y)
-	print(simple_y.shape)
-	print(simple_y.dtype)
-	print(pred_y_stances)
-	print(pred_y_stances.shape)
-	print(pred_y_stances.dtype)
+	print('True outputs: ' + str(simple_y))
+	print('Shape of true outputs: '+ str(simple_y.shape))
+	print('Type of true outputs: ' + str(simple_y.dtype))
+	print('Predicted outputs: ' + str(pred_y_stances))
+	print('Shape of predicted outputs: '+ str(pred_y_stances.shape))
+	print('Type of predicted outputs: ' + str(pred_y_stances.dtype))
 	print ("Epoch %d, train error: %.2f, valid accuracy: %.1f %%" % (epoch, epoch_error, valid_accuracy * 100.0))
 	
 	# <uncomment this to look try f1 scores (currently breaks tho)>

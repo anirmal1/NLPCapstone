@@ -76,12 +76,13 @@ def generate_features(stances,dataset,name):
     X_refuting = gen_or_load_feats(refuting_features, h, b, "fnc_1_baseline_master/features/refuting."+name+".npy")
     X_polarity = gen_or_load_feats(polarity_features, h, b, "fnc_1_baseline_master/features/polarity."+name+".npy")
     X_hand = gen_or_load_feats(hand_features, h, b, "fnc_1_baseline_master/features/hand."+name+".npy")
-
-    X = np.c_[X_hand, X_polarity, X_refuting, X_overlap]
+    X_discuss = gen_or_load_feats(discuss_features, h, b, "fnc_1_baseline_master/features/discuss."+name+".npy")
+    X_vader_sentiment = gen_or_load_feats(get_sentiment_difference, h, b, "fnc_1_baseline_master/features/vader_sentiment."+name+".npy")
+    
+    X = np.c_[X_vader_sentiment, X_discuss, X_hand, X_polarity, X_refuting, X_overlap]
 
     X = X.reshape(len(y), 44, 1)
     y = np.asarray(y).reshape(len(y), 1, 1)
-
 
     return X,y
 
@@ -132,8 +133,8 @@ if USE_LSTM:
 		cell_headlines = tf.contrib.rnn.BasicLSTMCell(RNN_HIDDEN, state_is_tuple=True, reuse=True) 
 		# Initialize batch size, initial states
 		batch_size_headlines= tf.shape(inputs_headlines)[0]
-		initial_state_headlines = cell_headlines.zero_state(batch_size_headlines, tf.float32)
-		# Hidden states, outputs
+		initial_state_headlines = rnn_states_articles 
+	        # Hidden states, outputs
 		rnn_outputs_headlines, rnn_states_headlines = tf.nn.dynamic_rnn(cell_headlines, inputs_headlines, initial_state=initial_state_headlines, time_major=False)
 else:
 	cell = tf.nn.rnn_cell.BasicRNNCell(RNN_HIDDEN)
@@ -215,33 +216,33 @@ session = tf.Session()
 session.run(tf.global_variables_initializer())
 
 for epoch in range(10):
-	epoch_error = 0
-	for fold in fold_stances:
-	# for fold in range(1): #for fold in fold_stances: <uncomment this to iterate through folds--currently breaks tho for more than 1:(>
-        # here train_fn is what triggers backprop. error and accuracy on their
-        # own do not trigger the backprop.
-        # x, y = generate_batch(num_bits=NUM_BITS, batch_size=BATCH_SIZE)
-        # TODO replace above line with getting feature vectors for current batch
-		x_article_batch = x_articles[fold]
-		x_headline_batch = x_headlines[fold]
-		y = y_vals[fold]
+        epoch_error = 0
+        for fold in fold_stances:
+		# for fold in range(1): #for fold in fold_stances: <uncomment this to iterate through folds--currently breaks tho for more than 1:(>
+		# here train_fn is what triggers backprop. error and accuracy on their
+		# own do not trigger the backprop.
+	        x_article_batch = x_articles[fold]
+	        x_headline_batch = x_headlines[fold]
+	        y = y_vals[fold]
 
-		epoch_error += session.run([error, train_fn], {
-			inputs_articles: x_article_batch,
-			inputs_headlines: x_headline_batch,
-      outputs: y
-		})[0]
-        
-	# epoch_error /= len(fold_stances) # ITERATIONS_PER_EPOCH
-    
-	valid_accuracy, pred_y_stances = session.run([accuracy, pred_stance], {
+	        # Training error
+	        epoch_error += session.run([error, train_fn], {
+		        inputs_articles: x_article_batch,
+		        inputs_headlines: x_headline_batch,
+		        outputs: y
+	        })[0]
+
+        print("Epoch " + str(epoch) + " error: " + str(epoch_error/len(fold_stances)))
+
+        # Test error
+        valid_accuracy, pred_y_stances = session.run([accuracy, pred_stance], {
 		inputs_articles:  valid_x_articles,
 		inputs_headlines: valid_x_headlines,
 		outputs: valid_y
 	})
 
-	simple_y = np.array([array[0].tolist().index(1) for array in valid_y])
-	'''
+        simple_y = np.array([array[0].tolist().index(1) for array in valid_y])
+        '''
 	print('True outputs: ' + str(simple_y))
 	print('Shape of true outputs: '+ str(simple_y.shape))
 	print('Type of true outputs: ' + str(simple_y.dtype))
@@ -252,8 +253,10 @@ for epoch in range(10):
 	'''	
 
 	# <uncomment this to look try f1 scores (currently breaks tho)>
-	f1_score = metrics.f1_score(simple_y, pred_y_stances, average=None)
-	print("F1 MEAN score: " + str(f1_score))
+        f1_score = metrics.f1_score(simple_y, pred_y_stances, average='macro')
+        print("F1 MEAN score: " + str(f1_score))
     
-	# f1_score_labels =  metrics.f1_score(valid_y, pred_y_stances, labels=LABELS, average=None)
-	# print("F1 LABEL scores: " + str(f1_score_labels))
+        f1_score_labels =  metrics.f1_score(simple_y, pred_y_stances, labels=[0, 1, 2, 3], average=None)
+        print("F1 LABEL scores: " + str(f1_score_labels))
+
+        report_score(simple_y, pred_y_stances)

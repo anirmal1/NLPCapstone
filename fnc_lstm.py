@@ -187,10 +187,6 @@ print ("Finished defining graph")
 ##                           TRAINING LOOP                                    ##
 ################################################################################
 
-NUM_BITS = 10
-ITERATIONS_PER_EPOCH = 100
-# BATCH_SIZE = 16
-
 # acquire data from files
 # NOTE: For the word vectors, folds really means batches
 d = DataSet()
@@ -203,13 +199,11 @@ x_headlines = {}
 y_vals = {}
 
 for fold in fold_stances:
-	x_headlines[fold], x_articles[fold], y_vals[fold] = get_articles_word_vectors(fold_stances[fold], d, embeddings) # generate_features(fold_stances[fold], d, str(fold))
+	x_headlines[fold], x_articles[fold], y_vals[fold] = get_articles_word_vectors(fold_stances[fold], d, embeddings) 
 
+valid_x_headlines, valid_x_articles, valid_y = get_articles_word_vectors(hold_out_stances, d, embeddings) 
 
-valid_x_headlines, valid_x_articles, valid_y = get_articles_word_vectors(hold_out_stances, d, embeddings) # generate_features(hold_out_stances, d, "holdout")
-
-
-print ("Finished separating folds")
+print ("Finished separating batches")
 
 session = tf.Session()
 # For some reason it is our job to do this:
@@ -259,4 +253,9 @@ for epoch in range(10):
         f1_score_labels =  metrics.f1_score(simple_y, pred_y_stances, labels=[0, 1, 2, 3], average=None)
         print("F1 LABEL scores: " + str(f1_score_labels))
 
-        report_score(simple_y, pred_y_stances)
+        # Convert to string labels for FNC scoring metric
+        label_map = {0 : "agree", 1 : "disagree", 2 : "discuss", 3 : "unrelated"}
+        simple_y_str = [label_map[label] for label in simple_y]
+        pred_y_stances_str = [label_map[label] for label in pred_y_stances]
+        
+        report_score(simple_y_str, pred_y_stances_str)

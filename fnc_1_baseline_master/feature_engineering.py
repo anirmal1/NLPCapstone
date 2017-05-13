@@ -38,6 +38,12 @@ def get_sentiment_difference(headlines, bodies):
         X.append(x)
     return X
 
+def get_tf_idf(headlines, bodies):
+    tfidf_vec = feature_extraction.text.TfidfVectorizer()
+    tfidf_h = tfidf_vec.fit_transform(headlines)
+    tfidf_b = tfidf_vec.fit_transform(bodies)
+    return tfidf_h, tfidf_b
+
 def gen_or_load_feats(feat_fn, headlines, bodies, feature_file):
     if not os.path.isfile(feature_file):
         feats = feat_fn(headlines, bodies)

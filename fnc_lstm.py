@@ -27,7 +27,7 @@ from sklearn import metrics
 from fnc_1_baseline_master.utils.dataset import DataSet
 from fnc_1_baseline_master.utils.generate_test_splits import kfold_split, get_stances_for_folds
 from fnc_1_baseline_master.feature_engineering import refuting_features, polarity_features, hand_features, gen_or_load_feats
-from fnc_1_baseline_master.feature_engineering import word_overlap_features
+from fnc_1_baseline_master.feature_engineering import word_overlap_features, discuss_features, get_sentiment_difference, get_tfidf
 from fnc_1_baseline_master.utils.score import report_score, LABELS, score_submission
 from fnc_1_baseline_master.utils.system import parse_params, check_version
 
@@ -78,7 +78,7 @@ def generate_features(stances,dataset,name):
     X_hand = gen_or_load_feats(hand_features, h, b, "fnc_1_baseline_master/features/hand."+name+".npy")
     X_discuss = gen_or_load_feats(discuss_features, h, b, "fnc_1_baseline_master/features/discuss."+name+".npy")
     X_vader_sentiment = gen_or_load_feats(get_sentiment_difference, h, b, "fnc_1_baseline_master/features/vader_sentiment."+name+".npy")
-    X_tfidf_headline, X_tfidf_bodies = gen_or_load_feats(get_sentiment_difference, h, b, "fnc_1_baseline_master/features/tfidf."+name+".npy")
+    X_tfidf_headline, X_tfidf_bodies = gen_or_load_feats(get_tfidf, h, b, "fnc_1_baseline_master/features/tfidf."+name+".npy")
  
     X = np.c_[X_tfidf_headline, X_tfidf_bodies, X_vader_sentiment, X_discuss, X_hand, X_polarity, X_refuting, X_overlap]
 
@@ -159,13 +159,15 @@ rnn_outputs_headlines, rnn_states_headlines = tf.nn.dynamic_rnn(cell_headlines, 
 rnn_outputs = tf.concat([rnn_outputs_articles, rnn_outputs_headlines], 1)
 
 # Concatenate global features to rnn_outputs 
+global_feat = tf.placeholder(tf.float32)
+rnn_global_outputs = tf.concat([rnn_outputs, global_feat], 1)
 
 # project output from rnn output size to OUTPUT_SIZE. Sometimes it is worth adding
 # an extra layer here.
 final_projection = lambda x: layers.linear(x, num_outputs=HIDDEN_OUTPUT_SIZE, activation_fn=tf.nn.sigmoid)
 
 # apply projection to every timestep.
-predicted_outputs = tf.map_fn(final_projection, rnn_outputs)
+predicted_outputs = tf.map_fn(final_projection, rnn_global_outputs)
 
 # Take softmax, Get predicted label
 softmaxes = tf.nn.softmax(predicted_outputs[0:, -1, 0:]) #tf.nn.softmax(predicted_outputs)
@@ -201,10 +203,21 @@ x_articles = {}
 x_headlines = {}
 y_vals = {}
 
+x_articles_global = {}
+x_headlines_global = {}
+y_global = {}
+
+# Get word vectors
 for fold in fold_stances:
 	x_headlines[fold], x_articles[fold], y_vals[fold] = get_articles_word_vectors(fold_stances[fold], d, embeddings) 
 
 valid_x_headlines, valid_x_articles, valid_y = get_articles_word_vectors(hold_out_stances, d, embeddings) 
+
+# Get global features
+for fold in fold_stances:
+	x_global[fold], y_global[fold] = generate_features(fold_stances[fold], d, str(fold))
+
+valid_x_global, valid_y_global = generate_features(hold_out_stances, d, "holdout")
 
 print ("Finished separating batches")
 
@@ -217,28 +230,35 @@ for fold in fold_stances: #for epoch in range(10):
 	for epoch in range(10):# for fold in fold_stances:
 		ids = list(range(len(folds)))
 		del ids[fold]
+		# Training word vectors
 		x_train_articles = np.vstack(tuple([x_articles[i] for i in ids]))
 		x_train_headlines = np.vstack(tuple([x_headlines[i] for i in ids]))
 		y_train = np.vstack(tuple([y_vals[i] for i in ids]))
-
+		# Training global features
+		x_train_global = np.vstack(tuple([x_global[i] for i in ids]))
+		# Validation word vectors
 		x_article_batch = x_articles[fold]
 		x_headline_batch = x_headlines[fold]
 		y = y_vals[fold]
-
+		# Validation global features
+		x_batch_global = valid_x_global[fold]
+		
 		# Training error
 		epoch_error += session.run([error, train_fn], {
 			inputs_articles: x_train_articles, # x_article_batch,
 			inputs_headlines: x_train_headlines, # x_headline_batch,
-			outputs: y_train # y
+			outputs: y_train, # y
+			global_feat: x_train_global
 		})[0]
 
 		print("Epoch " + str(epoch) + " error: " + str(epoch_error/len(fold_stances)))
 
-	# Test error
+	# Validation error
 	valid_accuracy, pred_y_stances = session.run([accuracy, pred_stance], {
 		inputs_articles:  x_article_batch, # valid_x_articles,
 		inputs_headlines: x_headline_batch, # valid_x_headlines
-		outputs: y # valid_y
+		outputs: y, # valid_y
+		global_feat: x_batch_global
 	})
 
 	simple_y = np.array([array[0].tolist().index(1) for array in y])
@@ -279,5 +299,4 @@ print("F1 LABEL scores: " + str(f1_score_labels))
 label_map = {0 : "agree", 1 : "disagree", 2 : "discuss", 3 : "unrelated"}
 simple_y_str = [label_map[label] for label in simple_y]
 pred_y_stances_str = [label_map[label] for label in pred_y_stances]
-report_score(simple_y_str, pred_y_stances_str)
-       
+report_score(simple_y_str, pred_y_stances_str) 

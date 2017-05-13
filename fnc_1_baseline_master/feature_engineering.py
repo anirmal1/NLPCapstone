@@ -33,15 +33,17 @@ def get_sentiment_difference(headlines, bodies):
     X = []
     for i in range(len(headlines)):
         h_sentiment = _sia.polarity_scores(headlines[i])
-        b_sentiment = _sia.polarity_scores(bodies[i])
+        b_sentiment = _sia.polarity_scores(" ".join(bodies[i]))
         x = [math.fabs(h_sentiment['compound'] - b_sentiment['compound']), math.fabs(h_sentiment['neu'] - b_sentiment['neu']), math.fabs(h_sentiment['pos'] - b_sentiment['pos']), math.fabs(h_sentiment['neg'] - b_sentiment['neg'])]
         X.append(x)
     return X
 
-def get_tf_idf(headlines, bodies):
+def get_tfidf(headlines, bodies):
     tfidf_vec = feature_extraction.text.TfidfVectorizer()
     tfidf_h = tfidf_vec.fit_transform(headlines)
-    tfidf_b = tfidf_vec.fit_transform(bodies)
+    # Transform bodies to be one string instead list of words
+    bodies_str = [" ".join(body) for body in bodies]
+    tfidf_b = tfidf_vec.fit_transform(bodies_str)
     return tfidf_h, tfidf_b
 
 def gen_or_load_feats(feat_fn, headlines, bodies, feature_file):

@@ -210,52 +210,71 @@ session = tf.Session()
 session.run(tf.global_variables_initializer())
 
 for epoch in range(10):
-        epoch_error = 0
-        for fold in fold_stances:
-		# for fold in range(1): #for fold in fold_stances: <uncomment this to iterate through folds--currently breaks tho for more than 1:(>
-		# here train_fn is what triggers backprop. error and accuracy on their
-		# own do not trigger the backprop.
-	        x_article_batch = x_articles[fold]
-	        x_headline_batch = x_headlines[fold]
-	        y = y_vals[fold]
+	epoch_error = 0
+	for fold in fold_stances:
+		ids = list(range(len(folds)))
+		del ids[fold]
+		x_train_articles = np.vstack(tuple([x_articles[i] for i in ids]))
+		x_train_headlines = np.vstack(tuple([x_headlines[i] for i in ids]))
+		y_train = np.hstack(tuple([y_train[i] for i in ids]))
 
-	        # Training error
-	        epoch_error += session.run([error, train_fn], {
-		        inputs_articles: x_article_batch,
-		        inputs_headlines: x_headline_batch,
-		        outputs: y
-	        })[0]
+		x_article_batch = x_articles[fold]
+		x_headline_batch = x_headlines[fold]
+		y = y_vals[fold]
 
-        print("Epoch " + str(epoch) + " error: " + str(epoch_error/len(fold_stances)))
+		# Training error
+		epoch_error += session.run([error, train_fn], {
+			inputs_articles: x_train_articles, # x_article_batch,
+			inputs_headlines: x_train_headlines, # x_headline_batch,
+			outputs: y_train # y
+		})[0]
 
-        # Test error
-        valid_accuracy, pred_y_stances = session.run([accuracy, pred_stance], {
+		print("Epoch " + str(epoch) + " error: " + str(epoch_error/len(fold_stances)))
+
+		# Test error
+		valid_accuracy, pred_y_stances = session.run([accuracy, pred_stance], {
+			inputs_articles:  x_train_batch, # valid_x_articles,
+			inputs_headlines: x_headline_batch, # valid_x_headlines
+			outputs: y # valid_y
+		})
+
+		simple_y = np.array([array[0].tolist().index(1) for array in y])
+		'''
+		print('True outputs: ' + str(simple_y))
+		print('Shape of true outputs: '+ str(simple_y.shape))
+		print('Type of true outputs: ' + str(simple_y.dtype))
+		print('Predicted outputs: ' + str(pred_y_stances))
+		print('Shape of predicted outputs: '+ str(pred_y_stances.shape))
+		print('Type of predicted outputs: ' + str(pred_y_stances.dtype))
+		print ("Epoch %d, train error: %.2f, valid accuracy: %.1f %%" % (epoch, epoch_error, valid_accuracy * 100.0))
+		'''	
+
+		f1_score = metrics.f1_score(simple_y, pred_y_stances, average='macro')
+		print("F1 MEAN score: " + str(f1_score))
+		f1_score_labels =  metrics.f1_score(simple_y, pred_y_stances, labels=[0, 1, 2, 3], average=None)
+		print("F1 LABEL scores: " + str(f1_score_labels))
+
+		# Convert to string labels for FNC scoring metric
+		label_map = {0 : "agree", 1 : "disagree", 2 : "discuss", 3 : "unrelated"}
+		simple_y_str = [label_map[label] for label in simple_y]
+		pred_y_stances_str = [label_map[label] for label in pred_y_stances]
+		report_score(simple_y_str, pred_y_stances_str)
+
+valid_accuracy, pred_y_stances = session.run([accuracy, pred_stance], {
 		inputs_articles:  valid_x_articles,
 		inputs_headlines: valid_x_headlines,
 		outputs: valid_y
 	})
 
-        simple_y = np.array([array[0].tolist().index(1) for array in valid_y])
-        '''
-	print('True outputs: ' + str(simple_y))
-	print('Shape of true outputs: '+ str(simple_y.shape))
-	print('Type of true outputs: ' + str(simple_y.dtype))
-	print('Predicted outputs: ' + str(pred_y_stances))
-	print('Shape of predicted outputs: '+ str(pred_y_stances.shape))
-	print('Type of predicted outputs: ' + str(pred_y_stances.dtype))
-	print ("Epoch %d, train error: %.2f, valid accuracy: %.1f %%" % (epoch, epoch_error, valid_accuracy * 100.0))
-	'''	
+simple_y = np.array([array[0].tolist().index(1) for array in valid_y])
+f1_score = metrics.f1_score(simple_y, pred_y_stances, average='macro')
+print("F1 MEAN score: " + str(f1_score))
+f1_score_labels =  metrics.f1_score(simple_y, pred_y_stances, labels=[0, 1, 2, 3], average=None)
+print("F1 LABEL scores: " + str(f1_score_labels))
 
-	# <uncomment this to look try f1 scores (currently breaks tho)>
-        f1_score = metrics.f1_score(simple_y, pred_y_stances, average='macro')
-        print("F1 MEAN score: " + str(f1_score))
-    
-        f1_score_labels =  metrics.f1_score(simple_y, pred_y_stances, labels=[0, 1, 2, 3], average=None)
-        print("F1 LABEL scores: " + str(f1_score_labels))
-
-        # Convert to string labels for FNC scoring metric
-        label_map = {0 : "agree", 1 : "disagree", 2 : "discuss", 3 : "unrelated"}
-        simple_y_str = [label_map[label] for label in simple_y]
-        pred_y_stances_str = [label_map[label] for label in pred_y_stances]
-        
-        report_score(simple_y_str, pred_y_stances_str)
+# Convert to string labels for FNC scoring metric
+label_map = {0 : "agree", 1 : "disagree", 2 : "discuss", 3 : "unrelated"}
+simple_y_str = [label_map[label] for label in simple_y]
+pred_y_stances_str = [label_map[label] for label in pred_y_stances]
+report_score(simple_y_str, pred_y_stances_str)
+       

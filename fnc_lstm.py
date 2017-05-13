@@ -216,7 +216,7 @@ for epoch in range(10):
 		del ids[fold]
 		x_train_articles = np.vstack(tuple([x_articles[i] for i in ids]))
 		x_train_headlines = np.vstack(tuple([x_headlines[i] for i in ids]))
-		y_train = np.hstack(tuple([y_train[i] for i in ids]))
+		y_train = np.hstack(tuple([y_vals[i] for i in ids]))
 
 		x_article_batch = x_articles[fold]
 		x_headline_batch = x_headlines[fold]

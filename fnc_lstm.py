@@ -170,8 +170,15 @@ pred_stance = tf.argmax(softmaxes, 1)
 #ipred_array = np.zeros(4)
 #pred_array[LABELS.index(pred_stance)] = 1
 
+# print(predicted_outputs.shape)
+# print(outputs.shape)
 # compute elementwise cross entropy.
 error = -(outputs * tf.log(predicted_outputs + TINY) + (1.0 - outputs) * tf.log(1.0 - predicted_outputs + TINY))
+# true_outputs = outputs[0:, -1, 0:]
+# print(true_outputs.shape)
+# true_outputs = tf.cast(true_outputs, tf.int32)
+# last_pred = predicted_outputs[0:, -1, 0:]
+# error = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=true_outputs, logits=predicted_outputs)
 error = tf.reduce_mean(error)
 
 # optimize
@@ -229,7 +236,7 @@ for fold in fold_stances: #for epoch in range(10):
 			outputs: y_train # y
 		})[0]
 
-		print("Epoch " + str(epoch) + " error: " + str(epoch_error/len(fold_stances)))
+	print("Batch " + str(fold) + " error: " + str(epoch_error/10))
 
 	# Test error
 	valid_accuracy, pred_y_stances = session.run([accuracy, pred_stance], {

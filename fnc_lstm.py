@@ -31,6 +31,8 @@ from fnc_1_baseline_master.feature_engineering import word_overlap_features
 from fnc_1_baseline_master.utils.score import report_score, LABELS, score_submission
 from fnc_1_baseline_master.utils.system import parse_params, check_version
 
+model_path = 'lstm_model.ckpt'
+
 ################################################################################
 ##                             WORD EMBEDDINGS                                ##
 ################################################################################
@@ -197,7 +199,7 @@ print ("Finished defining graph")
 # acquire data from files
 # NOTE: For the word vectors, folds really means batches
 d = DataSet()
-folds, hold_out = kfold_split(d, n_folds=512)
+folds, hold_out = kfold_split(d, n_folds=32)
 fold_stances, hold_out_stances = get_stances_for_folds(d, folds, hold_out)
 embeddings = WordEmbeddings()
 
@@ -266,6 +268,8 @@ for fold in fold_stances: #for epoch in range(10):
 	simple_y_str = [label_map[label] for label in simple_y]
 	pred_y_stances_str = [label_map[label] for label in pred_y_stances]
 	report_score(simple_y_str, pred_y_stances_str)
+
+print('\n#### RUNNING ON HOLDOUT SET ####')
 
 valid_accuracy, pred_y_stances = session.run([accuracy, pred_stance], {
 		inputs_articles:  valid_x_articles,

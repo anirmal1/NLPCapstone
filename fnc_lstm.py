@@ -167,6 +167,7 @@ rnn_outputs_headlines, rnn_states_headlines = tf.nn.dynamic_rnn(cell_headlines, 
 
 # Concatenate articles and headlines rnn_outputs
 rnn_outputs = tf.concat([rnn_outputs_articles, rnn_outputs_headlines], 1)
+print("RNN_ouputs shape: " + str(rnn_outputs.shape))
 
 # Concatenate global features to rnn_outputs 
 global_feat = tf.placeholder(tf.float32)
@@ -236,6 +237,7 @@ for fold in fold_stances:
 	x_global[fold], y_global[fold] = generate_features(fold_stances[fold], d, str(fold))
 
 valid_x_global, valid_y_global = generate_features(hold_out_stances, d, "holdout")
+print("GLOBAL FEATURES SHAPE: " + str(valid_x_global.shape))
 
 print ("Finished separating batches")
 
@@ -245,6 +247,13 @@ session.run(tf.global_variables_initializer())
 
 for fold in fold_stances: #for epoch in range(10):
 	epoch_error = 0
+	# Test/Validation word vectors
+	x_article_batch = x_articles[fold]
+	x_headline_batch = x_headlines[fold]
+	y = y_vals[fold]
+	# Test/Validation global features
+	x_batch_global = x_global[fold]
+
 	for epoch in range(10):# for fold in fold_stances:
 		ids = list(range(len(folds)))
 		del ids[fold]
@@ -254,13 +263,7 @@ for fold in fold_stances: #for epoch in range(10):
 		y_train = np.vstack(tuple([y_vals[i] for i in ids]))
 		# Training global features
 		x_train_global = np.vstack(tuple([x_global[i] for i in ids]))
-		# Validation word vectors
-		x_article_batch = x_articles[fold]
-		x_headline_batch = x_headlines[fold]
-		y = y_vals[fold]
-		# Validation global features
-		x_batch_global = valid_x_global[fold]
-		
+
 		# Training error
 		epoch_error += session.run([error, train_fn], {
 			inputs_articles: x_train_articles, # x_article_batch,
@@ -269,9 +272,9 @@ for fold in fold_stances: #for epoch in range(10):
 			global_feat: x_train_global
 		})[0]
 
-	print("Batch " + str(fold) + " error: " + str(epoch_error/10))
+	print("Batch " + str(fold) + " training error: " + str(epoch_error/10))
 
-	# Validation error
+	# Batch Validation error
 	valid_accuracy, pred_y_stances = session.run([accuracy, pred_stance], {
 		inputs_articles:  x_article_batch, # valid_x_articles,
 		inputs_headlines: x_headline_batch, # valid_x_headlines
@@ -291,9 +294,9 @@ for fold in fold_stances: #for epoch in range(10):
 	'''	
 
 	f1_score = metrics.f1_score(simple_y, pred_y_stances, average='macro')
-	print("F1 MEAN score: " + str(f1_score))
+	print("Batch " + str(batch) + " F1 MEAN score: " + str(f1_score))
 	f1_score_labels =  metrics.f1_score(simple_y, pred_y_stances, labels=[0, 1, 2, 3], average=None)
-	print("F1 LABEL scores: " + str(f1_score_labels))
+	print("Batch " + str(batch) + " F1 LABEL scores: " + str(f1_score_labels))
 
 	# Convert to string labels for FNC scoring metric
 	label_map = {0 : "agree", 1 : "disagree", 2 : "discuss", 3 : "unrelated"}
@@ -306,14 +309,15 @@ print('\n#### RUNNING ON HOLDOUT SET ####')
 valid_accuracy, pred_y_stances = session.run([accuracy, pred_stance], {
 		inputs_articles:  valid_x_articles,
 		inputs_headlines: valid_x_headlines,
-		outputs: valid_y
+		outputs: valid_y,
+		global_feat: valid_x_global
 	})
 
 simple_y = np.array([array[0].tolist().index(1) for array in valid_y])
 f1_score = metrics.f1_score(simple_y, pred_y_stances, average='macro')
-print("F1 MEAN score: " + str(f1_score))
+print("Overall F1 MEAN score: " + str(f1_score))
 f1_score_labels =  metrics.f1_score(simple_y, pred_y_stances, labels=[0, 1, 2, 3], average=None)
-print("F1 LABEL scores: " + str(f1_score_labels))
+print("Overall F1 LABEL scores: " + str(f1_score_labels))
 
 # Convert to string labels for FNC scoring metric
 label_map = {0 : "agree", 1 : "disagree", 2 : "discuss", 3 : "unrelated"}

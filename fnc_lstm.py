@@ -224,16 +224,16 @@ session.run(tf.global_variables_initializer())
 
 for fold in fold_stances: #for epoch in range(10):
 	epoch_error = 0
+	x_article_batch = x_articles[fold]
+	x_headline_batch = x_headlines[fold]
+	y = y_vals[fold]
+
 	for epoch in range(10):# for fold in fold_stances:
 		ids = list(range(len(folds)))
 		del ids[fold]
 		x_train_articles = np.vstack(tuple([x_articles[i] for i in ids]))
 		x_train_headlines = np.vstack(tuple([x_headlines[i] for i in ids]))
 		y_train = np.vstack(tuple([y_vals[i] for i in ids]))
-
-		x_article_batch = x_articles[fold]
-		x_headline_batch = x_headlines[fold]
-		y = y_vals[fold]
 
 		# Training error
 		epoch_error += session.run([error, train_fn], {

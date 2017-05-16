@@ -25,6 +25,24 @@ def score_submission(gold_labels, test_labels):
 
     return score, cm
 
+def score_lstm(actual, predicted):
+    score_related = 0.0
+    total_related = 0.0
+    score_unrelated = 0.0
+    total_unrelated = 0.0
+    related_weight = 0.9
+    unrelated_weight = 0.1
+    for i, (g, t) in enumerate(zip(actual, predicted)):
+        if g == t: 
+            if LABELS[g] in RELATED:
+              score_related += 1
+            else:
+              score_unrelated += 1
+        if LABELS[t] in RELATED:
+            total_related += 1
+        else:
+            total_unrelated += 1
+    return 100 * (related_weight * (score_related / total_related) + unrelated_weight * (score_unrelated / total_unrelated))
 
 def print_confusion_matrix(cm):
     lines = []

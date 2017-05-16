@@ -31,6 +31,8 @@ from fnc_1_baseline_master.feature_engineering import word_overlap_features, dis
 from fnc_1_baseline_master.utils.score import report_score, LABELS, score_submission
 from fnc_1_baseline_master.utils.system import parse_params, check_version
 
+model_path = 'lstm_model.ckpt'
+
 ################################################################################
 ##                             WORD EMBEDDINGS                                ##
 ################################################################################
@@ -129,6 +131,7 @@ if USE_LSTM:
 	with tf.variable_scope('scope1') as scope1:  
 		# Create cell
 		cell_articles = tf.contrib.rnn.BasicLSTMCell(RNN_HIDDEN, state_is_tuple=True)
+		cell_articles = tf.contrib.rnn.core_rnn_cell.DropoutWrapper(cell_articles, input_keep_prob=0.5, output_keep_prob=0.5)
 		# Initialize batch size, initial states
 		batch_size_articles= tf.shape(inputs_articles)[0]
 		initial_state_articles = cell_articles.zero_state(batch_size_articles, tf.float32)
@@ -137,7 +140,8 @@ if USE_LSTM:
 	with tf.variable_scope('scope1') as scope1:
 		scope1.reuse_variables() 
 		# Create cell
-		cell_headlines = tf.contrib.rnn.BasicLSTMCell(RNN_HIDDEN, state_is_tuple=True, reuse=True) 
+		cell_headlines = tf.contrib.rnn.BasicLSTMCell(RNN_HIDDEN, state_is_tuple=True, reuse=True)
+		cell_headlines = tf.contrib.rnn.core_rnn_cell.DropoutWrapper(cell_headlines, input_keep_prob=0.5, output_keep_prob=0.5) 
 		# Initialize batch size, initial states
 		batch_size_headlines= tf.shape(inputs_headlines)[0]
 		initial_state_headlines = rnn_states_articles 
@@ -181,8 +185,15 @@ pred_stance = tf.argmax(softmaxes, 1)
 #ipred_array = np.zeros(4)
 #pred_array[LABELS.index(pred_stance)] = 1
 
+# print(predicted_outputs.shape)
+# print(outputs.shape)
 # compute elementwise cross entropy.
 error = -(outputs * tf.log(predicted_outputs + TINY) + (1.0 - outputs) * tf.log(1.0 - predicted_outputs + TINY))
+# true_outputs = outputs[0:, -1, 0:]
+# print(true_outputs.shape)
+# true_outputs = tf.cast(true_outputs, tf.int32)
+# last_pred = predicted_outputs[0:, -1, 0:]
+# error = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=true_outputs, logits=predicted_outputs)
 error = tf.reduce_mean(error)
 
 # optimize
@@ -200,8 +211,10 @@ print ("Finished defining graph")
 
 # acquire data from files
 # NOTE: For the word vectors, folds really means batches
+saver = tf.train.Saver()
+
 d = DataSet()
-folds, hold_out = kfold_split(d, n_folds=512)
+folds, hold_out = kfold_split(d, n_folds=32)
 fold_stances, hold_out_stances = get_stances_for_folds(d, folds, hold_out)
 embeddings = WordEmbeddings()
 
@@ -256,7 +269,7 @@ for fold in fold_stances: #for epoch in range(10):
 			global_feat: x_train_global
 		})[0]
 
-		print("Epoch " + str(epoch) + " error: " + str(epoch_error/len(fold_stances)))
+	print("Batch " + str(fold) + " error: " + str(epoch_error/10))
 
 	# Validation error
 	valid_accuracy, pred_y_stances = session.run([accuracy, pred_stance], {
@@ -288,6 +301,8 @@ for fold in fold_stances: #for epoch in range(10):
 	pred_y_stances_str = [label_map[label] for label in pred_y_stances]
 	report_score(simple_y_str, pred_y_stances_str)
 
+print('\n#### RUNNING ON HOLDOUT SET ####')
+
 valid_accuracy, pred_y_stances = session.run([accuracy, pred_stance], {
 		inputs_articles:  valid_x_articles,
 		inputs_headlines: valid_x_headlines,
@@ -304,4 +319,6 @@ print("F1 LABEL scores: " + str(f1_score_labels))
 label_map = {0 : "agree", 1 : "disagree", 2 : "discuss", 3 : "unrelated"}
 simple_y_str = [label_map[label] for label in simple_y]
 pred_y_stances_str = [label_map[label] for label in pred_y_stances]
-report_score(simple_y_str, pred_y_stances_str) 
+report_score(simple_y_str, pred_y_stances_str)
+
+saver.save(session, model_path)

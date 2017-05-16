@@ -53,10 +53,10 @@ def get_articles_word_vectors(stances, dataset, word_embeddings):
 		article = word_embeddings.get_embedding_for_sentence(b[i])
 		headline = word_embeddings.get_embedding_for_headline(h[i]) # trying to get equal length headline #get_embedding_for_sentence(h[i])
 		y_val = y[i]
-		if article.ndim == 2 and headline.ndim == 2 and headline.shape[0] == 30 and headline.shape[1] == 100:
-			embeddings_list.append(article)
-			headline_embeddings_list.append(headline)
-			ys.append(y_val)
+
+		embeddings_list.append(article)
+		headline_embeddings_list.append(headline)
+		ys.append(y_val)
 
 	return np.array(headline_embeddings_list), np.array(embeddings_list), np.array(ys, dtype=np.float32) # TODO how do you properly return the embeddings in 3 dimensions?? :(
     

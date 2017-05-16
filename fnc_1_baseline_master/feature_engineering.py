@@ -3,7 +3,6 @@ import re
 import nltk
 import numpy as np
 from sklearn import feature_extraction
-from tqdm import tqdm
 from fnc_1_baseline_master.LIWC.LIWCutil import parse_liwc, reverse_dict
 from nltk.sentiment import SentimentIntensityAnalyzer
 import math
@@ -63,7 +62,7 @@ def gen_or_load_feats_liwc(feat_fn, lexicon_list, headlines, bodies, feature_fil
 
 def word_overlap_features(headlines, bodies):
     X = []
-    for i, (headline, body) in tqdm(enumerate(zip(headlines, bodies))):
+    for i, (headline, body) in (enumerate(zip(headlines, bodies))):
         clean_headline = clean(headline)
         clean_body = clean(body)
         clean_headline = get_tokenized_lemmas(clean_headline)
@@ -92,7 +91,7 @@ def refuting_features(headlines, bodies):
         'retract'
     ]
     X = []
-    for i, (headline, body) in tqdm(enumerate(zip(headlines, bodies))):
+    for i, (headline, body) in (enumerate(zip(headlines, bodies))):
         clean_headline = clean(headline)
         clean_headline = get_tokenized_lemmas(clean_headline)
         features = [1 if word in clean_headline else 0 for word in _refuting_words]
@@ -121,7 +120,7 @@ def polarity_features(headlines, bodies):
         tokens = get_tokenized_lemmas(text)
         return sum([t in _refuting_words for t in tokens]) % 2
     X = []
-    for i, (headline, body) in tqdm(enumerate(zip(headlines, bodies))):
+    for i, (headline, body) in (enumerate(zip(headlines, bodies))):
         clean_headline = clean(headline)
         clean_body = clean(body)
         features = []
@@ -137,7 +136,7 @@ def discuss_features(headlines, bodies):
         tokens = get_tokenized_lemmas(text)
         return sum([t in _discuss_words for t in tokens]) % 2
     X = []
-    for i, (headline, body) in tqdm(enumerate(zip(headlines, bodies))):
+    for i, (headline, body) in (enumerate(zip(headlines, bodies))):
         clean_headline = clean(headline)
         clean_body = clean(body)
         features = []
@@ -160,7 +159,7 @@ def LIWC_lexicons(w):
 
 def reg_counts(lexicon_list, headlines, bodies):
     X = []
-    for i, (headline, body) in tqdm(enumerate(zip(headlines, bodies))):
+    for i, (headline, body) in (enumerate(zip(headlines, bodies))):
         clean_headline = clean(headline)
         clean_headline = get_tokenized_lemmas(clean_headline)
         features = [1 if word in clean_headline else 0 for word in lexicon_list]
@@ -173,7 +172,7 @@ def overlap_counts(lexicon_list, headlines, bodies):
         tokens = get_tokenized_lemmas(text)
         return sum([t in lexicon_list for t in tokens]) % 2
     X = []
-    for i, (headline, body) in tqdm(enumerate(zip(headlines, bodies))):
+    for i, (headline, body) in (enumerate(zip(headlines, bodies))):
         clean_headline = clean(headline)
         clean_body = clean(body)
         features = []
@@ -274,7 +273,7 @@ def hand_features(headlines, bodies):
         return features
 
     X = []
-    for i, (headline, body) in tqdm(enumerate(zip(headlines, bodies))):
+    for i, (headline, body) in (enumerate(zip(headlines, bodies))):
         X.append(binary_co_occurence(headline, body)
                  + binary_co_occurence_stops(headline, body)
                  + count_grams(headline, body))

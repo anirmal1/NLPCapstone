@@ -124,6 +124,7 @@ if USE_LSTM:
 	with tf.variable_scope('scope1') as scope1:  
 		# Create cell
 		cell_articles = tf.contrib.rnn.BasicLSTMCell(RNN_HIDDEN, state_is_tuple=True)
+		cell_articles = tf.contrib.rnn.core_rnn_cell.DropoutWrapper(cell_articles, input_keep_prob=0.5, output_keep_prob=0.5)
 		# Initialize batch size, initial states
 		batch_size_articles= tf.shape(inputs_articles)[0]
 		initial_state_articles = cell_articles.zero_state(batch_size_articles, tf.float32)
@@ -132,7 +133,8 @@ if USE_LSTM:
 	with tf.variable_scope('scope1') as scope1:
 		scope1.reuse_variables() 
 		# Create cell
-		cell_headlines = tf.contrib.rnn.BasicLSTMCell(RNN_HIDDEN, state_is_tuple=True, reuse=True) 
+		cell_headlines = tf.contrib.rnn.BasicLSTMCell(RNN_HIDDEN, state_is_tuple=True, reuse=True)
+		cell_headlines = tf.contrib.rnn.core_rnn_cell.DropoutWrapper(cell_headlines, input_keep_prob=0.5, output_keep_prob=0.5) 
 		# Initialize batch size, initial states
 		batch_size_headlines= tf.shape(inputs_headlines)[0]
 		initial_state_headlines = rnn_states_articles 
@@ -198,6 +200,8 @@ print ("Finished defining graph")
 
 # acquire data from files
 # NOTE: For the word vectors, folds really means batches
+saver = tf.train.Saver()
+
 d = DataSet()
 folds, hold_out = kfold_split(d, n_folds=32)
 fold_stances, hold_out_stances = get_stances_for_folds(d, folds, hold_out)
@@ -288,4 +292,5 @@ label_map = {0 : "agree", 1 : "disagree", 2 : "discuss", 3 : "unrelated"}
 simple_y_str = [label_map[label] for label in simple_y]
 pred_y_stances_str = [label_map[label] for label in pred_y_stances]
 report_score(simple_y_str, pred_y_stances_str)
-       
+
+saver.save(session, model_path)

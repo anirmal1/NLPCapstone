@@ -101,10 +101,10 @@ LEARNING_RATE = 0.01
 
 USE_LSTM = True
 
-inputs_articles = tf.placeholder(tf.float32, (None, 200, INPUT_SIZE))  # (batch, time, in)
-inputs_headlines = tf.placeholder(tf.float32, (None, None, INPUT_SIZE))
+inputs_articles = tf.placeholder(tf.float32, (None, 200, INPUT_SIZE), name='input_articles')  # (batch, time, in)
+inputs_headlines = tf.placeholder(tf.float32, (None, None, INPUT_SIZE), name='input_headlines')
 
-outputs = tf.placeholder(tf.float32, (None, None, OUTPUT_SIZE)) # (batch, time, out)
+outputs = tf.placeholder(tf.float32, (None, None, OUTPUT_SIZE), name='outputs') # (batch, time, out)
 
 ## Here cell can be any function you want, provided it has two attributes:
 #     - cell.zero_state(batch_size, dtype)- tensor which is an initial value
@@ -124,7 +124,7 @@ if USE_LSTM:
 	with tf.variable_scope('scope1') as scope1:  
 		# Create cell
 		cell_articles = tf.contrib.rnn.BasicLSTMCell(RNN_HIDDEN, state_is_tuple=True)
-		cell_articles = tf.contrib.rnn.core_rnn_cell.DropoutWrapper(cell_articles, input_keep_prob=0.5, output_keep_prob=0.5)
+		cell_articles = tf.contrib.rnn.core_rnn_cell.DropoutWrapper(cell_articles, input_keep_prob=0.7, output_keep_prob=0.2)
 		# Initialize batch size, initial states
 		batch_size_articles= tf.shape(inputs_articles)[0]
 		initial_state_articles = cell_articles.zero_state(batch_size_articles, tf.float32)
@@ -134,7 +134,7 @@ if USE_LSTM:
 		scope1.reuse_variables() 
 		# Create cell
 		cell_headlines = tf.contrib.rnn.BasicLSTMCell(RNN_HIDDEN, state_is_tuple=True, reuse=True)
-		cell_headlines = tf.contrib.rnn.core_rnn_cell.DropoutWrapper(cell_headlines, input_keep_prob=0.5, output_keep_prob=0.5) 
+		cell_headlines = tf.contrib.rnn.core_rnn_cell.DropoutWrapper(cell_headlines, input_keep_prob=0.7, output_keep_prob=0.2) 
 		# Initialize batch size, initial states
 		batch_size_headlines= tf.shape(inputs_headlines)[0]
 		initial_state_headlines = rnn_states_articles 
@@ -171,6 +171,7 @@ predicted_outputs = tf.map_fn(final_projection, rnn_outputs)
 # Take softmax, Get predicted label
 softmaxes = tf.nn.softmax(predicted_outputs[0:, -1, 0:]) #tf.nn.softmax(predicted_outputs)
 pred_stance = tf.argmax(softmaxes, 1)
+# pred_stance = tf.Variable(initial_value=tf.argmax(softmaxes, 1), name='pred_stance', dtype=tf.int64)
 #ipred_array = np.zeros(4)
 #pred_array[LABELS.index(pred_stance)] = 1
 
@@ -186,7 +187,7 @@ error = -(outputs * tf.log(predicted_outputs + TINY) + (1.0 - outputs) * tf.log(
 error = tf.reduce_mean(error)
 
 # optimize
-train_fn = tf.train.AdamOptimizer(learning_rate=LEARNING_RATE).minimize(error)
+train_fn = tf.train.AdamOptimizer(learning_rate=LEARNING_RATE, name='train_fn').minimize(error)
 
 # assuming that absolute difference between output and correct answer is 0.5
 # or less we can round it to the correct output.
@@ -200,10 +201,9 @@ print ("Finished defining graph")
 
 # acquire data from files
 # NOTE: For the word vectors, folds really means batches
-saver = tf.train.Saver()
 
 d = DataSet()
-folds, hold_out = kfold_split(d, n_folds=32)
+folds, hold_out = kfold_split(d, n_folds=10)
 fold_stances, hold_out_stances = get_stances_for_folds(d, folds, hold_out)
 embeddings = WordEmbeddings()
 
@@ -219,9 +219,28 @@ valid_x_headlines, valid_x_articles, valid_y = get_articles_word_vectors(hold_ou
 print ("Finished separating batches")
 
 session = tf.Session()
+saver = tf.train.Saver()
 # For some reason it is our job to do this:
 session.run(tf.global_variables_initializer())
 
+for epoch in range(10): # for fold in fold_stances: #for epoch in range(10):
+	epoch_error = 0
+
+	ids = list(range(len(folds)))
+	x_train_articles = np.vstack(tuple([x_articles[i] for i in ids]))
+	x_train_headlines = np.vstack(tuple([x_headlines[i] for i in ids]))
+	y_train = np.vstack(tuple([y_vals[i] for i in ids]))
+
+	# Training error
+	epoch_error += session.run([error, train_fn], {
+		inputs_articles: x_train_articles, # x_article_batch,
+		inputs_headlines: x_train_headlines, # x_headline_batch,
+		outputs: y_train # y
+	})[0]
+
+	print("Batch " + str(epoch) + " error: " + str(epoch_error))
+
+'''
 for fold in fold_stances: #for epoch in range(10):
 	epoch_error = 0
 	x_article_batch = x_articles[fold]
@@ -253,15 +272,16 @@ for fold in fold_stances: #for epoch in range(10):
 
 	simple_y = np.array([array[0].tolist().index(1) for array in y])
 	'''
-		print('True outputs: ' + str(simple_y))
-		print('Shape of true outputs: '+ str(simple_y.shape))
-		print('Type of true outputs: ' + str(simple_y.dtype))
-		print('Predicted outputs: ' + str(pred_y_stances))
-		print('Shape of predicted outputs: '+ str(pred_y_stances.shape))
-		print('Type of predicted outputs: ' + str(pred_y_stances.dtype))
-		print ("Epoch %d, train error: %.2f, valid accuracy: %.1f %%" % (epoch, epoch_error, valid_accuracy * 100.0))
-	'''	
+'''	print('True outputs: ' + str(simple_y))
+	print('Shape of true outputs: '+ str(simple_y.shape))
+	print('Type of true outputs: ' + str(simple_y.dtype))
+	print('Predicted outputs: ' + str(pred_y_stances))
+	print('Shape of predicted outputs: '+ str(pred_y_stances.shape))
+	print('Type of predicted outputs: ' + str(pred_y_stances.dtype))
+	print ("Epoch %d, train error: %.2f, valid accuracy: %.1f %%" % (epoch, epoch_error, valid_accuracy * 100.0))
+'''	
 
+'''
 	f1_score = metrics.f1_score(simple_y, pred_y_stances, average='macro')
 	print("F1 MEAN score: " + str(f1_score))
 	f1_score_labels =  metrics.f1_score(simple_y, pred_y_stances, labels=[0, 1, 2, 3], average=None)
@@ -272,6 +292,7 @@ for fold in fold_stances: #for epoch in range(10):
 	simple_y_str = [label_map[label] for label in simple_y]
 	pred_y_stances_str = [label_map[label] for label in pred_y_stances]
 	report_score(simple_y_str, pred_y_stances_str)
+'''
 
 print('\n#### RUNNING ON HOLDOUT SET ####')
 

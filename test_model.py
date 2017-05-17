@@ -26,6 +26,7 @@ def get_article_word_vectors(headline, article, stance, word_embeddings):
 def main():
 	print('Starting test model...')
 	session = tf.Session()
+	# saver = tf.train.Saver(tf.all_variables())
 	saver = tf.train.import_meta_graph(model_path + '.meta')
 	saver.restore(session, save_path=model_path)
 	print('Model restored.')

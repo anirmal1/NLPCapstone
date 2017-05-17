@@ -165,13 +165,12 @@ initial_state_headlines = cell_headlines.zero_state(batch_size_headlines, tf.flo
 '''rnn_outputs_articles, rnn_states_articles = tf.nn.dynamic_rnn(cell_articles, inputs_articles, initial_state=initial_state_articles, time_major=False)
 rnn_outputs_headlines, rnn_states_headlines = tf.nn.dynamic_rnn(cell_headlines, inputs_headlines, initial_state=initial_state_headlines, time_major=False)'''
 
-# Concatenate articles and headlines rnn_outputs
-rnn_outputs = tf.concat([rnn_outputs_articles, rnn_outputs_headlines], 1)
-print("RNN_ouputs shape: " + str(rnn_outputs.shape))
+# Concatenate articles and headlines rnn_states
+rnn_states = tf.concat([rnn_states_articles, rnn_states_headlines], 0)
 
 # Concatenate global features to rnn_outputs 
-global_feat = tf.placeholder(tf.float32)
-rnn_global_outputs = tf.concat([rnn_outputs, global_feat], 1)
+global_feat = tf.placeholder(tf.float32, (None, 44))
+rnn_global_outputs = tf.concat([rnn_states, global_feat], 1)
 
 # project output from rnn output size to OUTPUT_SIZE. Sometimes it is worth adding
 # an extra layer here.
@@ -262,14 +261,24 @@ for fold in fold_stances: #for epoch in range(10):
 		x_train_headlines = np.vstack(tuple([x_headlines[i] for i in ids]))
 		y_train = np.vstack(tuple([y_vals[i] for i in ids]))
 		# Training global features
+		print("Articles shape = " + str(x_train_articles.shape))
+		print("Headlines shape = " + str(x_train_headlines.shape))
 		x_train_global = np.vstack(tuple([x_global[i] for i in ids]))
+		print("Global features shape = " + str(x_train_global.shape))
+		
+		# Reshape global features for concatenation with rnn_outputs
+		x_train_global_reshape = np.reshape(x_train_global, (1, -1))
+		flatten_len = x_train_global_reshape.shape[1]
+		padding = RNN_HIDDEN - (flatten_len % 10)
+		x_padded = np.append(x_train_global_reshape, np.zeros(padding))
+		#x_train_global_reshape = np.reshape(x_padded, (BATCH_SIZE, 10))
 
 		# Training error
 		epoch_error += session.run([error, train_fn], {
 			inputs_articles: x_train_articles, # x_article_batch,
 			inputs_headlines: x_train_headlines, # x_headline_batch,
 			outputs: y_train, # y
-			global_feat: x_train_global
+			global_feat: x_train_global_reshape
 		})[0]
 
 	print("Batch " + str(fold) + " training error: " + str(epoch_error/10))

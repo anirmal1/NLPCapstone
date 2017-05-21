@@ -110,7 +110,7 @@ def main():
 	for fold in fold_stances:
 		x_headlines[fold], x_articles[fold], y_vals[fold] = get_articles_word_vectors(fold_stances[fold], d, embeddings)
 
-	valid_x_headlines, valid_x_articles, valid_y = get_articles_word_vectors(hold_out_stances, d, embeddings)
+	test_x_headlines, test_x_articles, test_y = get_articles_word_vectors(hold_out_stances, d, embeddings)
 	print('Finished separating folds')
 
 	# TODO get global feature data
@@ -119,32 +119,66 @@ def main():
 	model.session.run(tf.global_variables_initializer())
 
 	for fold in fold_stances:
-		for epoch in range(10):
-			epoch_error = 0
-			
-			# TODO batching
-			ids = list(range(len(folds)))
-			x_train_articles = np.vstack(tuple([x_articles[i] for i in ids]))
-			x_train_headlines = np.vstack(tuple([x_headlines[i] for i in ids]))
-			y_train = np.vstack(tuple([y_vals[i] for i in ids]))
+		ids = list(range(len(folds)))
+		del ids[fold]
+		x_train_articles = np.vstack(tuple([x_articles[i] for i in ids]))
+		x_train_headlines = np.vstack(tuple([x_headlines[i] for i in ids]))
+		y_train = np.vstack(tuple([y_vals[i] for i in ids]))
+		print('train articles shape = ' + str(x_train_articles.shape))
+		print('train headlines shape = ' + str(x_train_headlines.shape))
+		print('y train shape = ' + str(y_train.shape))
 
-			# Training error
-			epoch_error += model.session.run([model.error, model.train_fn], {
-				model.inputs_articles: x_train_articles, # x_article_batch,
-				model.inputs_headlines: x_train_headlines, # x_headline_batch,
-				model.outputs: y_train # y
-			})[0]
+		x_valid_articles = x_articles[fold]
+		x_valid_headlines = x_headlines[fold]
+		y_valid = y_vals[fold]
+		
+		epoch_error = 0
+		for epoch in range(10):
+			
+			batch_size = 32
+			article_batches = []
+			headline_batches = []
+			output_batches = []
+
+			start = 0
+			while start < len(x_train_articles):
+				article_chunk = x_train_articles[start:start + batch_size]
+				headline_chunk = x_train_headlines[start:start + batch_size]
+				output_chunk = y_train[start:start + batch_size]
+				article_batches.append(article_chunk)
+				headline_batches.append(headline_chunk)
+				output_batches.append(output_chunk)
+				start += batch_size
+	
+			for i in range(len(article_batches)):
+				# Training error
+				epoch_error += model.session.run([model.error, model.train_fn], {
+					model.inputs_articles: article_batches[i],
+					model.inputs_headlines: headline_batches[i],
+					model.outputs: output_batches[i]
+				})[0]
+
+		print('Training error = ' + str(epoch_error / 10.0))
+		
+		# cross-validation error
+		valid_accuracy, pred_y_stances = model.session.run([model.accuracy, model.pred_stance], {
+				model.inputs_articles:  x_valid_articles,
+				model.inputs_headlines: x_valid_headlines,
+				model.outputs: y_valid
+			})
+
+
 
 	# assess performance on validation set
 	print('\n#### RUNNING ON HOLDOUT SET ####')
 
-	valid_accuracy, pred_y_stances = model.session.run([model.accuracy, model.pred_stance], {
-			model.inputs_articles:  valid_x_articles,
-			model.inputs_headlines: valid_x_headlines,
-			model.outputs: valid_y
+	test_accuracy, pred_y_stances = model.session.run([model.accuracy, model.pred_stance], {
+			model.inputs_articles:  test_x_articles,
+			model.inputs_headlines: test_x_headlines,
+			model.outputs: test_y
 		})
 
-	simple_y = np.array([array[0].tolist().index(1) for array in valid_y])
+	simple_y = np.array([array[0].tolist().index(1) for array in test_y])
 	f1_score = metrics.f1_score(simple_y, pred_y_stances, average='macro')
 	print("F1 MEAN score: " + str(f1_score))
 	f1_score_labels =  metrics.f1_score(simple_y, pred_y_stances, labels=[0, 1, 2, 3], average=None)

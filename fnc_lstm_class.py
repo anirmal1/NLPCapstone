@@ -132,10 +132,11 @@ def main():
 		x_valid_headlines = x_headlines[fold]
 		y_valid = y_vals[fold]
 		
-		epoch_error = 0
+		fold_error = 0
+		print('Training fold ' + str(fold))
 		for epoch in range(10):
 			
-			batch_size = 32
+			batch_size = 512
 			article_batches = []
 			headline_batches = []
 			output_batches = []
@@ -152,13 +153,16 @@ def main():
 	
 			for i in range(len(article_batches)):
 				# Training error
-				epoch_error += model.session.run([model.error, model.train_fn], {
+				epoch_error = model.session.run([model.error, model.train_fn], {
 					model.inputs_articles: article_batches[i],
 					model.inputs_headlines: headline_batches[i],
 					model.outputs: output_batches[i]
 				})[0]
+				print('\tEpoch error = ' + str(epoch_error))				
 
-		print('Training error = ' + str(epoch_error / 10.0))
+				fold_error += epoch_error
+
+		print('Training error (fold) = ' + str(fold_error / 10.0) + '\n')
 		
 		# cross-validation error
 		valid_accuracy, pred_y_stances = model.session.run([model.accuracy, model.pred_stance], {

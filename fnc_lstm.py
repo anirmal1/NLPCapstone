@@ -60,8 +60,6 @@ def get_articles_word_vectors(stances, dataset, word_embeddings):
 
 	return np.array(headline_embeddings_list), np.array(embeddings_list), np.array(ys, dtype=np.float32) # TODO how do you properly return the embeddings in 3 dimensions?? :(
     
-
-
 ################################################################################
 ##                             GLOBAL FEATURES                                ##
 ################################################################################
@@ -93,18 +91,17 @@ def generate_features(stances,dataset,name):
 ################################################################################
 
 INPUT_SIZE    = 100 # Length of GLoVe word embeddings (100d)
-RNN_HIDDEN    = 10
-OUTPUT_SIZE   = 4       # Final output (label)
-HIDDEN_OUTPUT_SIZE = 4 # Softmax over all four labels
+RNN_HIDDEN    = 10 # Size of hidden layer
+OUTPUT_SIZE   = 4       # Prob for each label
 TINY          = 1e-6    # to avoid NaNs in logs
 LEARNING_RATE = 0.01
 
 USE_LSTM = True
 
 inputs_articles = tf.placeholder(tf.float32, (None, 200, INPUT_SIZE), name='input_articles')  # (batch, time, in)
-inputs_headlines = tf.placeholder(tf.float32, (None, None, INPUT_SIZE), name='input_headlines')
+inputs_headlines = tf.placeholder(tf.float32, (None, 30, INPUT_SIZE), name='input_headlines')
 
-outputs = tf.placeholder(tf.float32, (None, None, OUTPUT_SIZE), name='outputs') # (batch, time, out)
+outputs = tf.placeholder(tf.float32, (None, OUTPUT_SIZE), name='outputs') # (batch, out) for backprop
 
 ## Here cell can be any function you want, provided it has two attributes:
 #     - cell.zero_state(batch_size, dtype)- tensor which is an initial value
@@ -137,6 +134,7 @@ if USE_LSTM:
 		cell_headlines = tf.contrib.rnn.core_rnn_cell.DropoutWrapper(cell_headlines, input_keep_prob=0.7, output_keep_prob=0.2) 
 		# Initialize batch size, initial states
 		batch_size_headlines= tf.shape(inputs_headlines)[0]
+		# TODO: Use states or outputs???
 		initial_state_headlines = rnn_states_articles 
 	        # Hidden states, outputs
 		rnn_outputs_headlines, rnn_states_headlines = tf.nn.dynamic_rnn(cell_headlines, inputs_headlines, initial_state=initial_state_headlines, time_major=False)
@@ -158,18 +156,19 @@ initial_state_headlines = cell_headlines.zero_state(batch_size_headlines, tf.flo
 '''rnn_outputs_articles, rnn_states_articles = tf.nn.dynamic_rnn(cell_articles, inputs_articles, initial_state=initial_state_articles, time_major=False)
 rnn_outputs_headlines, rnn_states_headlines = tf.nn.dynamic_rnn(cell_headlines, inputs_headlines, initial_state=initial_state_headlines, time_major=False)'''
 
-# Concatenate articles and headlines rnn_outputs
-rnn_outputs = tf.concat([rnn_outputs_articles, rnn_outputs_headlines], 1)
+# Concatenate the LAST articles and headlines rnn_outputs
+# TODO: GET LAST OUTPUT!!!!
+rnn_outputs = tf.concat(rnn_outputs_articles, rnn_outputs_headlines, 0)
 
 # project output from rnn output size to OUTPUT_SIZE. Sometimes it is worth adding
 # an extra layer here.
-final_projection = lambda x: layers.linear(x, num_outputs=HIDDEN_OUTPUT_SIZE, activation_fn=tf.nn.sigmoid)
+final_projection = lambda x: layers.linear(x, num_outputs=OUTPUT_SIZE, activation_fn=tf.nn.sigmoid)
 
 # apply projection to every timestep.
 predicted_outputs = tf.map_fn(final_projection, rnn_outputs)
 
 # Take softmax, Get predicted label
-softmaxes = tf.nn.softmax(predicted_outputs[0:, -1, 0:]) #tf.nn.softmax(predicted_outputs)
+softmaxes = tf.nn.softmax(predicted_outputs)
 pred_stance = tf.argmax(softmaxes, 1)
 # pred_stance = tf.Variable(initial_value=tf.argmax(softmaxes, 1), name='pred_stance', dtype=tf.int64)
 #ipred_array = np.zeros(4)
@@ -178,7 +177,7 @@ pred_stance = tf.argmax(softmaxes, 1)
 # print(predicted_outputs.shape)
 # print(outputs.shape)
 # compute elementwise cross entropy.
-error = -(outputs * tf.log(predicted_outputs + TINY) + (1.0 - outputs) * tf.log(1.0 - predicted_outputs + TINY))
+error = -(outputs * tf.log(softmaxes + TINY) + (1.0 - outputs) * tf.log(1.0 - softmaxes + TINY))
 # true_outputs = outputs[0:, -1, 0:]
 # print(true_outputs.shape)
 # true_outputs = tf.cast(true_outputs, tf.int32)
@@ -223,6 +222,7 @@ saver = tf.train.Saver()
 # For some reason it is our job to do this:
 session.run(tf.global_variables_initializer())
 
+'''
 for epoch in range(10): # for fold in fold_stances: #for epoch in range(10):
 	epoch_error = 0
 
@@ -239,9 +239,9 @@ for epoch in range(10): # for fold in fold_stances: #for epoch in range(10):
 	})[0]
 
 	print("Batch " + str(epoch) + " error: " + str(epoch_error))
-
 '''
-for fold in fold_stances: #for epoch in range(10):
+
+for fold in fold_stances:
 	epoch_error = 0
 	x_article_batch = x_articles[fold]
 	x_headline_batch = x_headlines[fold]
@@ -263,7 +263,7 @@ for fold in fold_stances: #for epoch in range(10):
 
 	print("Batch " + str(fold) + " error: " + str(epoch_error/10))
 
-	# Test error
+	# Validation error
 	valid_accuracy, pred_y_stances = session.run([accuracy, pred_stance], {
 		inputs_articles:  x_article_batch, # valid_x_articles,
 		inputs_headlines: x_headline_batch, # valid_x_headlines
@@ -271,17 +271,15 @@ for fold in fold_stances: #for epoch in range(10):
 	})
 
 	simple_y = np.array([array[0].tolist().index(1) for array in y])
-	'''
-'''	print('True outputs: ' + str(simple_y))
+
+	'''	print('True outputs: ' + str(simple_y))
 	print('Shape of true outputs: '+ str(simple_y.shape))
 	print('Type of true outputs: ' + str(simple_y.dtype))
 	print('Predicted outputs: ' + str(pred_y_stances))
 	print('Shape of predicted outputs: '+ str(pred_y_stances.shape))
 	print('Type of predicted outputs: ' + str(pred_y_stances.dtype))
 	print ("Epoch %d, train error: %.2f, valid accuracy: %.1f %%" % (epoch, epoch_error, valid_accuracy * 100.0))
-'''	
-
-'''
+	'''
 	f1_score = metrics.f1_score(simple_y, pred_y_stances, average='macro')
 	print("F1 MEAN score: " + str(f1_score))
 	f1_score_labels =  metrics.f1_score(simple_y, pred_y_stances, labels=[0, 1, 2, 3], average=None)
@@ -292,7 +290,6 @@ for fold in fold_stances: #for epoch in range(10):
 	simple_y_str = [label_map[label] for label in simple_y]
 	pred_y_stances_str = [label_map[label] for label in pred_y_stances]
 	report_score(simple_y_str, pred_y_stances_str)
-'''
 
 print('\n#### RUNNING ON HOLDOUT SET ####')
 

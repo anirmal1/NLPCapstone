@@ -31,26 +31,35 @@ class Classifier(object):
 		# LSTM cells, TODO make these bidrectional!
 		with tf.variable_scope('scope1') as scope1:  
 			# Create cell
-			self.cell_articles = tf.contrib.rnn.BasicLSTMCell(RNN_HIDDEN, state_is_tuple=True)
-			self.cell_articles = tf.contrib.rnn.core_rnn_cell.DropoutWrapper(self.cell_articles, input_keep_prob=0.7, output_keep_prob=0.2)
+			self.cell_articles_fw = tf.contrib.rnn.BasicLSTMCell(RNN_HIDDEN, state_is_tuple=True)
+			self.cell_articles_fw = tf.contrib.rnn.core_rnn_cell.DropoutWrapper(self.cell_articles_fw, input_keep_prob=0.7, output_keep_prob=0.2)
+			self.cell_articles_bw = tf.contrib.rnn.BasicLSTMCell(RNN_HIDDEN, state_is_tuple=True)
+			self.cell_articles_bw = tf.contrib.rnn.core_rnn_cell.DropoutWrapper(self.cell_articles_bw, input_keep_prob=0.7, output_keep_prob=0.2)
+			self.rnn_outputs_articles, self.rnn_states_articles = 	tf.nn.bidirectional_dynamic_rnn(self.cell_articles_fw, self.cell_articles_bw, self.inputs_articles, dtype=tf.float32)
 			# Initialize batch size, initial states
+			'''
 			batch_size_articles= tf.shape(self.inputs_articles)[0]
 			initial_state_articles = self.cell_articles.zero_state(batch_size_articles, tf.float32)
 			# Hidden states, outputs
 			self.rnn_outputs_articles, self.rnn_states_articles = tf.nn.dynamic_rnn(self.cell_articles, self.inputs_articles, initial_state=initial_state_articles, time_major=False)
+			'''
 		with tf.variable_scope('scope1') as scope1:
 			scope1.reuse_variables() 
 			# Create cell
-			self.cell_headlines = tf.contrib.rnn.BasicLSTMCell(RNN_HIDDEN, state_is_tuple=True, reuse=True)
-			self.cell_headlines = tf.contrib.rnn.core_rnn_cell.DropoutWrapper(self.cell_headlines, input_keep_prob=0.7, output_keep_prob=0.2) 
+			self.cell_headlines_fw = tf.contrib.rnn.BasicLSTMCell(RNN_HIDDEN, state_is_tuple=True, reuse=True)
+			self.cell_headlines_fw = tf.contrib.rnn.core_rnn_cell.DropoutWrapper(self.cell_headlines_fw, input_keep_prob=0.7, output_keep_prob=0.2) 
+			self.cell_headlines_bw = tf.contrib.rnn.BasicLSTMCell(RNN_HIDDEN, state_is_tuple=True, reuse=True)
+			self.cell_headlines_bw = tf.contrib.rnn.core_rnn_cell.DropoutWrapper(self.cell_headlines_bw, input_keep_prob=0.7, output_keep_prob=0.2) 
+			self.rnn_outputs_headlines, self.rnn_states_headlines = tf.nn.bidirectional_dynamic_rnn(self.cell_headlines_fw, self.cell_headlines_bw, self.inputs_headlines, dtype=tf.float32)
+			'''
 			# Initialize batch size, initial states
 			batch_size_headlines= tf.shape(self.inputs_headlines)[0]
 			initial_state_headlines = self.rnn_states_articles 
 			# Hidden states, outputs
 			self.rnn_outputs_headlines, self.rnn_states_headlines = tf.nn.dynamic_rnn(self.cell_headlines, self.inputs_headlines, initial_state=initial_state_headlines, time_major=False)
-
+			'''
 		# make prediction
-		self.rnn_outputs = tf.concat([self.rnn_outputs_articles, self.rnn_outputs_headlines], 1)
+		self.rnn_outputs = tf.concat([self.rnn_outputs_articles[0], self.rnn_outputs_articles[1], self.rnn_outputs_headlines[0], self.rnn_outputs_headlines[1]], 1)
 		final_projection = lambda x: layers.linear(x, num_outputs=HIDDEN_OUTPUT_SIZE, activation_fn=tf.nn.sigmoid)
 		predicted_outputs = tf.map_fn(final_projection, self.rnn_outputs) # TODO project only for the final output!
 		self.softmaxes = tf.nn.softmax(predicted_outputs[0:, -1, 0:])
@@ -134,6 +143,7 @@ def main():
 		
 		fold_error = 0
 		print('Training fold ' + str(fold))
+		j = 0
 		for epoch in range(10):
 			
 			batch_size = 512
@@ -161,8 +171,9 @@ def main():
 				print('\tEpoch error = ' + str(epoch_error))				
 
 				fold_error += epoch_error
+				j += 1
 
-		print('Training error (fold) = ' + str(fold_error / 10.0) + '\n')
+		print('Training error (fold) = ' + str(fold_error / j) + '\n')
 		
 		# cross-validation error
 		valid_accuracy, pred_y_stances = model.session.run([model.accuracy, model.pred_stance], {

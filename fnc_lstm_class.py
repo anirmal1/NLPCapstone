@@ -66,7 +66,8 @@ class Classifier(object):
 		self.pred_stance = tf.argmax(self.softmaxes, 1)
 
 		# cross entropy loss TODO compute cross entropy between softmax and expected output (a one-hot vector)
-		self.error = -(self.outputs * tf.log(predicted_outputs + TINY) + (1.0 - self.outputs) * tf.log(1.0 - predicted_outputs + TINY))
+		self.error = -(self.outputs[0:, -1, 0:] * tf.log(self.softmaxes + TINY) + (1.0 - self.outputs[0:, -1, 0:]) * tf.log(1.0 - self.softmaxes + TINY))
+		# self.error = -(self.outputs * tf.log(predicted_outputs + TINY) + (1.0 - self.outputs) * tf.log(1.0 - predicted_outputs + TINY))
 		self.error = tf.reduce_mean(self.error)
 		self.train_fn = tf.train.AdamOptimizer(learning_rate=LEARNING_RATE, name='train_fn').minimize(self.error)
 
@@ -133,9 +134,9 @@ def main():
 		x_train_articles = np.vstack(tuple([x_articles[i] for i in ids]))
 		x_train_headlines = np.vstack(tuple([x_headlines[i] for i in ids]))
 		y_train = np.vstack(tuple([y_vals[i] for i in ids]))
-		print('train articles shape = ' + str(x_train_articles.shape))
-		print('train headlines shape = ' + str(x_train_headlines.shape))
-		print('y train shape = ' + str(y_train.shape))
+		# print('train articles shape = ' + str(x_train_articles.shape))
+		# print('train headlines shape = ' + str(x_train_headlines.shape))
+		# print('y train shape = ' + str(y_train.shape))
 
 		x_valid_articles = x_articles[fold]
 		x_valid_headlines = x_headlines[fold]
@@ -182,7 +183,19 @@ def main():
 				model.outputs: y_valid
 			})
 
-
+		
+		simple_y = np.array([array[0].tolist().index(1) for array in test_y])
+		'''
+		f1_score = metrics.f1_score(simple_y, pred_y_stances, average='macro')
+		print("F1 MEAN score: " + str(f1_score))
+		f1_score_labels =  metrics.f1_score(simple_y, pred_y_stances, labels=[0, 1, 2, 3], average=None)
+		print("F1 LABEL scores: " + str(f1_score_labels))
+		'''
+		# Convert to string labels for FNC scoring metric
+		label_map = {0 : "agree", 1 : "disagree", 2 : "discuss", 3 : "unrelated"}
+		simple_y_str = [label_map[label] for label in simple_y]
+		pred_y_stances_str = [label_map[label] for label in pred_y_stances]
+		report_score(simple_y_str, pred_y_stances_str)
 
 	# assess performance on validation set
 	print('\n#### RUNNING ON HOLDOUT SET ####')

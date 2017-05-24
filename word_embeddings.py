@@ -23,6 +23,7 @@ class WordEmbeddings():
 	def get_embedding_for_headline(self, sentence):
 		sentence = sentence.split()
 		vectorList = []
+		length = min(30, len(sentence))
 		for i in range(30 - len(sentence)):
 			sentence.append(' ')
 		for i in range(30):
@@ -31,7 +32,7 @@ class WordEmbeddings():
 				vectorList.append(self.word_vector_map[word])
 			else:
 				vectorList.append(np.zeros(100)) # to address the dimensions issue (not sure if this is right tho)
-		return np.vstack(vectorList)
+		return np.vstack(vectorList), length
 
 	def get_embedding_for_sentence(self, sentence):
 		vectorList = []

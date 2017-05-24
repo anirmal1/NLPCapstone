@@ -20,12 +20,14 @@ class DataSet():
             s['Body ID'] = int(s['Body ID'])
 
         # Use truncated articles instead
-        trunc_art = trunc_articles()
+        trunc_art, lengths = trunc_articles()
+        self.lengths = dict()
         
-	#copy all bodies into a dictionary
+				#copy all bodies into a dictionary
         for body_id in trunc_art:
             #self.articles[int(article['Body ID'])] = article['articleBody']
             self.articles[int(body_id)] = trunc_art[body_id]
+            self.lengths[int(body_id)] = lengths[body_id]
 
         print("Total stances: " + str(len(self.stances)))
         print("Total bodies: " + str(len(self.articles)))

@@ -27,7 +27,7 @@ class Classifier(object):
 		# input/output placeholders
 		self.inputs_articles = tf.placeholder(tf.float32, (None, 200, INPUT_SIZE), name='input_articles')
 		self.inputs_headlines = tf.placeholder(tf.float32, (None, 30, INPUT_SIZE), name='inputs_headlines')	
-		self.outputs = tf.placeholder(tf.float32, (None, None, OUTPUT_SIZE), name='outputs') # TODO change to two dimensions
+		self.outputs = tf.placeholder(tf.float32, (None, OUTPUT_SIZE), name='outputs') # TODO change to two dimensions
 		self.h_lengths = tf.placeholder(tf.int32, (None, 2))
 		self.a_lengths = tf.placeholder(tf.int32, (None, 2))
 		self.global_feats = tf.placeholder(tf.float32, (None, 44))
@@ -69,20 +69,20 @@ class Classifier(object):
 		out4 = tf.gather_nd(self.rnn_outputs_headlines[1], self.h_lengths)
 
 		self.rnn_outputs = tf.concat([out1, out2, out3, out4, self.global_feats], 1)
-		print(self.rnn_outputs.shape)
 		# self.rnn_outputs = tf.concat([self.rnn_outputs_articles[0], self.rnn_outputs_articles[1], self.rnn_outputs_headlines[0], self.rnn_outputs_headlines[1]], 1)
-		final_projection = layers.linear(self.rnn_outputs, num_outputs=HIDDEN_OUTPUT_SIZE, activation_fn=tf.nn.sigmoid)
-		self.softmaxes = tf.nn.softmax(final_projection[0:, 0:])
-		self.pred_stance = tf.argmax(self.softmaxes, 1)
+		final_projection = layers.fully_connected(self.rnn_outputs, num_outputs=HIDDEN_OUTPUT_SIZE, activation_fn=tf.nn.sigmoid)
+		#self.softmaxes = tf.nn.softmax(final_projection[0:, 0:])
+		#self.pred_stance = tf.argmax(self.softmaxes, 1)
 
 		# cross entropy loss TODO compute cross entropy between softmax and expected output (a one-hot vector)
-		self.error = -(self.outputs[0:, -1, 0:] * tf.log(self.softmaxes + TINY) + (1.0 - self.outputs[0:, -1, 0:]) * tf.log(1.0 - self.softmaxes + TINY))
+		#self.error = -(self.outputs * tf.log(self.softmaxes + TINY) + (1.0 - self.outputs) * tf.log(1.0 - self.softmaxes + TINY))
 		# self.error = -(self.outputs * tf.log(predicted_outputs + TINY) + (1.0 - self.outputs) * tf.log(1.0 - predicted_outputs + TINY))
-		self.error = tf.reduce_mean(self.error)
+		#self.error = tf.reduce_mean(self.error)
+		self.error = tf.nn.softmax_cross_entropy_with_logits(labels=self.outputs, logits=final_projection)
 		self.train_fn = tf.train.AdamOptimizer(learning_rate=LEARNING_RATE, name='train_fn').minimize(self.error)
 
 		# accuracy TODO what is this even doing...
-		self.accuracy = tf.reduce_mean(tf.cast(tf.abs(self.outputs - final_projection) < 0.5, tf.float32))
+		#self.accuracy = tf.reduce_mean(tf.cast(tf.abs(self.outputs - final_projection) < 0.5, tf.float32))
 
 ###### END CLASSIFIER DEFINITION ######
 
@@ -94,7 +94,7 @@ def get_articles_word_vectors(stances, dataset, word_embeddings):
 		#y.append([[LABELS.index(stance['Stance'])]])
 		zeros = np.zeros(4)
 		zeros[LABELS.index(stance['Stance'])] = 1
-		y.append(np.array([zeros]))
+		y.append(np.array(zeros))
 		h.append(stance['Headline'])
 		b.append(dataset.articles[stance['Body ID']])
 		length_a.append(np.array([j % BATCH_SIZE, dataset.lengths[stance['Body ID']] - 1]))
@@ -243,15 +243,15 @@ def main():
 					model.a_lengths: length_a_batches[i],
 					model.global_feats: global_batches[i]
 				})[0]
-				print('\tEpoch ' + str(j) + ' error = ' + str(epoch_error))				
+				print('\tEpoch ' + str(j) + ' error = ' + str(np.mean(epoch_error)))				
 
-				fold_error += epoch_error
+				fold_error += np.mean(epoch_error)
 				j += 1
 
 		print('Training error (fold) = ' + str(fold_error / j) + '\n')
 		
 		# cross-validation error
-		valid_accuracy, pred_y_stances = model.session.run([model.accuracy, model.pred_stance], {
+		pred_y_stances = model.session.run([model.pred_stance], {
 				model.inputs_articles:  x_valid_articles,
 				model.inputs_headlines: x_valid_headlines,
 				model.outputs: y_valid,

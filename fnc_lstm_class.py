@@ -18,7 +18,7 @@ OUTPUT_SIZE = 4
 HIDDEN_OUTPUT_SIZE = 4
 TINY = 1e-6
 LEARNING_RATE = 0.0001
-BATCH_SIZE = 512
+BATCH_SIZE = 1024
 
 ################################################################################
 ##                           BIDIRECTIONAL LSTM                               ##
@@ -74,17 +74,18 @@ class Classifier(object):
 
 		self.rnn_outputs = tf.concat([out1, out2, out3, out4, self.global_feats], 1)
 		# self.rnn_outputs = tf.concat([self.rnn_outputs_articles[0], self.rnn_outputs_articles[1], self.rnn_outputs_headlines[0], self.rnn_outputs_headlines[1]], 1)
-		final_projection = layers.fully_connected(self.rnn_outputs, num_outputs=HIDDEN_OUTPUT_SIZE, activation_fn=tf.nn.sigmoid)
+		self.final_projection = layers.fully_connected(self.rnn_outputs, num_outputs=HIDDEN_OUTPUT_SIZE, activation_fn=tf.nn.sigmoid)
+		self.pred_stance = tf.argmax(self.final_projection, 1)
 		#self.softmaxes = tf.nn.softmax(final_projection[0:, 0:])
-		#self.pred_stance = tf.argmax(self.softmaxes, 1)
 
 		# cross entropy loss TODO compute cross entropy between softmax and expected output (a one-hot vector)
 		#self.error = -(self.outputs * tf.log(self.softmaxes + TINY) + (1.0 - self.outputs) * tf.log(1.0 - self.softmaxes + TINY))
 		# self.error = -(self.outputs * tf.log(predicted_outputs + TINY) + (1.0 - self.outputs) * tf.log(1.0 - predicted_outputs + TINY))
 		#self.error = tf.reduce_mean(self.error)
-		self.error = tf.nn.softmax_cross_entropy_with_logits(labels=self.outputs, logits=final_projection)
+		self.error = tf.nn.softmax_cross_entropy_with_logits(labels=self.outputs, logits=self.final_projection)
+		self.error = tf.reduce_mean(self.error)
 		self.train_fn = tf.train.AdamOptimizer(learning_rate=LEARNING_RATE, name='train_fn').minimize(self.error)
-
+		
 		# accuracy TODO what is this even doing...
 		#self.accuracy = tf.reduce_mean(tf.cast(tf.abs(self.outputs - final_projection) < 0.5, tf.float32))
 
@@ -271,25 +272,35 @@ def main():
 					model.a_lengths: length_a_batches_train[i],
 					model.global_feats: global_batches_train[i]
 				})[0]
-				print('\tEpoch ' + str(j) + ' error = ' + str(np.mean(epoch_error)))				
+				print('\tEpoch ' + str(j) + ' error = ' + str(epoch_error))				
 
-				fold_error += np.mean(epoch_error)
+				fold_error += epoch_error
 				j += 1
 
 		print('Training error (fold) = ' + str(fold_error / j) + '\n')
 		
-		# cross-validation error
-		pred_y_stances = model.session.run([model.pred_stance], {
-				model.inputs_articles:  x_valid_articles,
-				model.inputs_headlines: x_valid_headlines,
-				model.outputs: y_valid,
-				model.h_lengths: length_h_valid,
-				model.a_lengths: length_a_valid,
-				model.global_feats: global_valid
-			})
-
+		# Validation batches
+		article_batches_valid,headline_batches_valid,output_batches_valid,length_h_batches_valid,length_a_batches_valid, global_batches_valid = create_batches(x_valid_articles, 
+		x_valid_headlines, 
+		y_valid, 
+		length_h_valid, 
+		length_a_valid, 
+		global_valid)
+	
+		all_pred_y_stances = []
+		for i in range(len(article_batches_valid)):
+			# cross-validation error
+			pred_y_stances = model.session.run([model.pred_stance], {
+					model.inputs_articles: article_batches_valid[i],
+					model.inputs_headlines: headline_batches_valid[i],
+					model.outputs: output_batches_valid[i],
+					model.h_lengths: length_h_batches_valid[i],
+					model.a_lengths: length_a_batches_valid[i],
+					model.global_feats: global_batches_valid[i]
+				})
+			all_pred_y_stances = np.append(all_pred_y_stances, pred_y_stances)
 		
-		simple_y = np.array([array[0].tolist().index(1) for array in y_valid])
+		simple_y = np.array([array.tolist().index(1) for array in y_valid])
 		'''
 		f1_score = metrics.f1_score(simple_y, pred_y_stances, average='macro')
 		print("F1 MEAN score: " + str(f1_score))
@@ -299,31 +310,42 @@ def main():
 		# Convert to string labels for FNC scoring metric
 		label_map = {0 : "agree", 1 : "disagree", 2 : "discuss", 3 : "unrelated"}
 		simple_y_str = [label_map[label] for label in simple_y]
-		pred_y_stances_str = [label_map[label] for label in pred_y_stances]
+		pred_y_stances_str = [label_map[label] for label in all_pred_y_stances]
 		report_score(simple_y_str, pred_y_stances_str)
 
-	# assess performance on validation set
+	# assess performance on test set
 	print('\n#### RUNNING ON HOLDOUT SET ####')
 
-	test_accuracy, pred_y_stances = model.session.run([model.accuracy, model.pred_stance], {
-			model.inputs_articles:  test_x_articles,
-			model.inputs_headlines: test_x_headlines,
-			model.outputs: test_y,
-			model.h_lengths: test_h_lengths,
-			model.a_lengths: test_a_lengths,
-			model.global_feats: test_x_global
-		})
+	# Test batches
+	article_batches_test,headline_batches_test,output_batches_test,length_h_batches_test,length_a_batches_test,global_batches_test = create_batches(test_x_articles, 
+	test_x_headlines, 
+	test_y, 
+	test_h_lengths, 
+	test_a_lengths, 
+	test_x_global)
 
-	simple_y = np.array([array[0].tolist().index(1) for array in test_y])
-	f1_score = metrics.f1_score(simple_y, pred_y_stances, average='macro')
+	all_pred_y_test = []
+	for i in range(len(article_batches_test)):
+		pred_y_stances = model.session.run([model.pred_stance], {
+				model.inputs_articles:  article_batches_test[i],
+				model.inputs_headlines: headline_batches_test[i],
+				model.outputs: output_batches_test[i],
+				model.h_lengths: length_h_batches_test[i],
+				model.a_lengths: length_a_batches_test[i],
+				model.global_feats: global_batches_test[i]
+			})
+		all_pred_y_test = np.append(all_pred_y_test, pred_y_stances)
+
+	simple_y = np.array([array.tolist().index(1) for array in test_y])
+	f1_score = metrics.f1_score(simple_y, all_pred_y_test, average='macro')
 	print("F1 MEAN score: " + str(f1_score))
-	f1_score_labels =  metrics.f1_score(simple_y, pred_y_stances, labels=[0, 1, 2, 3], average=None)
+	f1_score_labels =  metrics.f1_score(simple_y, all_pred_y_test, labels=[0, 1, 2, 3], average=None)
 	print("F1 LABEL scores: " + str(f1_score_labels))
 
 	# Convert to string labels for FNC scoring metric
 	label_map = {0 : "agree", 1 : "disagree", 2 : "discuss", 3 : "unrelated"}
 	simple_y_str = [label_map[label] for label in simple_y]
-	pred_y_stances_str = [label_map[label] for label in pred_y_stances]
+	pred_y_stances_str = [label_map[label] for label in all_pred_y_test]
 	report_score(simple_y_str, pred_y_stances_str)
 
 if __name__ == '__main__':

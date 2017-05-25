@@ -20,6 +20,10 @@ TINY = 1e-6
 LEARNING_RATE = 0.0001
 BATCH_SIZE = 512
 
+################################################################################
+##                           BIDIRECTIONAL LSTM                               ##
+################################################################################
+
 class Classifier(object):
 	def __init__(self):
 		self.session = tf.Session()
@@ -84,7 +88,10 @@ class Classifier(object):
 		# accuracy TODO what is this even doing...
 		#self.accuracy = tf.reduce_mean(tf.cast(tf.abs(self.outputs - final_projection) < 0.5, tf.float32))
 
-###### END CLASSIFIER DEFINITION ######
+
+################################################################################
+##                             WORD VECTORS                                   ##
+################################################################################
 
 def get_articles_word_vectors(stances, dataset, word_embeddings):
 	b, y, h = [], [], []  # bodies, true labels, headlines
@@ -114,6 +121,10 @@ def get_articles_word_vectors(stances, dataset, word_embeddings):
 		ys.append(y_val)
 
 	return np.array(headline_embeddings_list), np.array(embeddings_list), np.array(ys, dtype=np.float32), np.array(length_h), np.array(length_a)  # TODO return outputs in one-hot vector form (2 dimensions)
+
+################################################################################
+##                             GLOBAL FEATURES                                ##
+################################################################################
 
 def generate_features(stances,dataset,name):
     h, b, y = [],[],[]
@@ -146,8 +157,44 @@ def generate_features(stances,dataset,name):
 
     return X,y
  
+################################################################################
+##                                 BATCHING                                   ##
+################################################################################
+def create_batches(x_articles, x_headlines, y, lengths_h, lengths_a, global_feats):	
+	article_batches = []
+	headline_batches = []
+	output_batches = []
+	length_h_batches = []
+	length_a_batches = []
+	global_batches = []
+
+	batch_size = BATCH_SIZE
+	start = 0
+	while start < len(x_articles):
+		article_chunk = x_articles[start:start + batch_size]
+		headline_chunk = x_headlines[start:start + batch_size]
+		output_chunk = y[start:start + batch_size]
+		length_h_chunk = lengths_h[start:start + batch_size]
+		length_a_chunk = lengths_a[start:start + batch_size]
+		for i in range(0, len(length_h_chunk)):
+			length_h_chunk[i][0] = i
+			length_a_chunk[i][0] = i
+		global_batches_chunk = global_feats[start:start + batch_size]
+		article_batches.append(article_chunk)
+		headline_batches.append(headline_chunk)
+		output_batches.append(output_chunk)
+		length_h_batches.append(length_h_chunk)
+		length_a_batches.append(length_a_chunk)
+		global_batches.append(global_batches_chunk)
+		start += batch_size
+	
+	return article_batches, headline_batches, output_batches, length_h_batches, length_a_batches, global_batches
+
+################################################################################
+##                               TRAINING LOOP                                ##
+################################################################################
+
 def main():
-	# set up data
 	d = DataSet()
 	folds, hold_out = kfold_split(d, n_folds=10)
 	fold_stances, hold_out_stances = get_stances_for_folds(d, folds, hold_out)
@@ -206,42 +253,23 @@ def main():
 		j = 0
 		for epoch in range(5):
 			
-			article_batches = []
-			headline_batches = []
-			output_batches = []
-			length_h_batches = []
-			length_a_batches = []
-			global_batches = []
+			# Training batches
+			article_batches_train,headline_batches_train,output_batches_train,length_h_batches_train,length_a_batches_train, global_batches_train = create_batches(x_train_articles, 
+			x_train_headlines, 
+			y_train, 
+			lengths_h_train, 
+			lengths_a_train, 
+			global_train)
 
-			batch_size = BATCH_SIZE
-			start = 0
-			while start < len(x_train_articles):
-				article_chunk = x_train_articles[start:start + batch_size]
-				headline_chunk = x_train_headlines[start:start + batch_size]
-				output_chunk = y_train[start:start + batch_size]
-				length_h_chunk = lengths_h_train[start:start + batch_size]
-				length_a_chunk = lengths_a_train[start:start + batch_size]
-				for i in range(0, len(length_h_chunk)):
-					length_h_chunk[i][0] = i
-					length_a_chunk[i][0] = i
-				global_batches_chunk = global_train[start:start + batch_size]
-				article_batches.append(article_chunk)
-				headline_batches.append(headline_chunk)
-				output_batches.append(output_chunk)
-				length_h_batches.append(length_h_chunk)
-				length_a_batches.append(length_a_chunk)
-				global_batches.append(global_batches_chunk)
-				start += batch_size
-	
-			for i in range(len(article_batches)):
+			for i in range(len(article_batches_train)):
 				# Training error
 				epoch_error = model.session.run([model.error, model.train_fn], {
-					model.inputs_articles: article_batches[i],
-					model.inputs_headlines: headline_batches[i],
-					model.outputs: output_batches[i],
-					model.h_lengths: length_h_batches[i],
-					model.a_lengths: length_a_batches[i],
-					model.global_feats: global_batches[i]
+					model.inputs_articles: article_batches_train[i],
+					model.inputs_headlines: headline_batches_train[i],
+					model.outputs: output_batches_train[i],
+					model.h_lengths: length_h_batches_train[i],
+					model.a_lengths: length_a_batches_train[i],
+					model.global_feats: global_batches_train[i]
 				})[0]
 				print('\tEpoch ' + str(j) + ' error = ' + str(np.mean(epoch_error)))				
 

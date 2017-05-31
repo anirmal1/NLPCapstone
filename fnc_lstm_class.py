@@ -13,11 +13,11 @@ from fnc_1_baseline_master.utils.system import parse_params, check_version
 model_path = 'lstm_model.ckpt' # for saving the model later
 
 INPUT_SIZE = 100 # length of GLoVe word embeddings
-RNN_HIDDEN = 100
+RNN_HIDDEN = 15
 OUTPUT_SIZE = 4
 HIDDEN_OUTPUT_SIZE = 4
 TINY = 1e-6
-LEARNING_RATE = 0.0001
+LEARNING_RATE = 0.001
 BATCH_SIZE = 1024
 
 ################################################################################
@@ -36,13 +36,17 @@ class Classifier(object):
 		self.a_lengths = tf.placeholder(tf.int32, (None, 2))
 		self.global_feats = tf.placeholder(tf.float32, (None, 44))
 
+		window = 4
+
 		# LSTM cells, TODO make these bidrectional!
 		with tf.variable_scope('scope1') as scope1:  
 			# Create cell
 			self.cell_articles_fw = tf.contrib.rnn.BasicLSTMCell(RNN_HIDDEN, state_is_tuple=True)
 			self.cell_articles_fw = tf.contrib.rnn.core_rnn_cell.DropoutWrapper(self.cell_articles_fw, input_keep_prob=0.7, output_keep_prob=0.2)
+			self.cell_articles_fw = tf.contrib.rnn.AttentionCellWrapper(self.cell_articles_fw, window, state_is_tuple=True)
 			self.cell_articles_bw = tf.contrib.rnn.BasicLSTMCell(RNN_HIDDEN, state_is_tuple=True)
 			self.cell_articles_bw = tf.contrib.rnn.core_rnn_cell.DropoutWrapper(self.cell_articles_bw, input_keep_prob=0.7, output_keep_prob=0.2)
+			self.cell_articles_bw = tf.contrib.rnn.AttentionCellWrapper(self.cell_articles_bw, window, state_is_tuple=True)
 			self.rnn_outputs_articles, self.rnn_states_articles = 	tf.nn.bidirectional_dynamic_rnn(self.cell_articles_fw, self.cell_articles_bw, self.inputs_articles, dtype=tf.float32)
 			# Initialize batch size, initial states
 			'''
@@ -55,9 +59,11 @@ class Classifier(object):
 			scope1.reuse_variables() 
 			# Create cell
 			self.cell_headlines_fw = tf.contrib.rnn.BasicLSTMCell(RNN_HIDDEN, state_is_tuple=True, reuse=True)
-			self.cell_headlines_fw = tf.contrib.rnn.core_rnn_cell.DropoutWrapper(self.cell_headlines_fw, input_keep_prob=0.7, output_keep_prob=0.2) 
+			self.cell_headlines_fw = tf.contrib.rnn.core_rnn_cell.DropoutWrapper(self.cell_headlines_fw, input_keep_prob=0.7, output_keep_prob=0.2)
+			self.cell_headlines_fw = tf.contrib.rnn.AttentionCellWrapper(self.cell_headlines_fw, window, state_is_tuple=True, reuse=True) 
 			self.cell_headlines_bw = tf.contrib.rnn.BasicLSTMCell(RNN_HIDDEN, state_is_tuple=True, reuse=True)
 			self.cell_headlines_bw = tf.contrib.rnn.core_rnn_cell.DropoutWrapper(self.cell_headlines_bw, input_keep_prob=0.7, output_keep_prob=0.2) 
+			self.cell_headlines_bw = tf.contrib.rnn.AttentionCellWrapper(self.cell_headlines_bw, window, state_is_tuple=True, reuse=True)
 			self.rnn_outputs_headlines, self.rnn_states_headlines = tf.nn.bidirectional_dynamic_rnn(self.cell_headlines_fw, self.cell_headlines_bw, self.inputs_headlines, dtype=tf.float32)
 			'''
 			# Initialize batch size, initial states
@@ -206,7 +212,7 @@ def main():
 	model = Classifier()
 	print('Set up model')
 
-	# get word vector data
+		# get word vector data
 	x_articles = {}
 	x_headlines = {}
 	y_vals = {}
@@ -228,6 +234,14 @@ def main():
 
 	# train LSTM (fold -> epoch -> batch)
 	model.session.run(tf.global_variables_initializer())
+	saver = tf.train.Saver(tf.all_variables())
+	'''
+	saver = tf.train.Saver({'cell_articles_fw' : model.cell_articles_fw,
+													'cell_articles_bw' : model.cell_articles_bw,
+													'cell_headlines_fw' : model.cell_headlines_fw,
+													'cell_headlines_bw' : model.cell_headlines_bw
+												})
+	'''
 
 	for fold in fold_stances:
 		ids = list(range(len(folds)))
@@ -249,11 +263,20 @@ def main():
 		length_a_valid = lengths_a[fold]		
 		global_valid = x_global[fold]
 
+		# Training batches
+		article_batches_train,headline_batches_train,output_batches_train,length_h_batches_train,length_a_batches_train, global_batches_train = create_batches(x_train_articles, 
+			x_train_headlines, 
+			y_train, 
+			lengths_h_train, 
+			lengths_a_train, 
+			global_train)
+			
 		fold_error = 0
 		print('Training fold ' + str(fold))
 		j = 0
-		for epoch in range(5):
+		for epoch in range(3): #(5):
 			
+			'''
 			# Training batches
 			article_batches_train,headline_batches_train,output_batches_train,length_h_batches_train,length_a_batches_train, global_batches_train = create_batches(x_train_articles, 
 			x_train_headlines, 
@@ -261,6 +284,9 @@ def main():
 			lengths_h_train, 
 			lengths_a_train, 
 			global_train)
+			'''
+
+			print(len(article_batches_train))
 
 			for i in range(len(article_batches_train)):
 				# Training error
@@ -347,6 +373,8 @@ def main():
 	simple_y_str = [label_map[label] for label in simple_y]
 	pred_y_stances_str = [label_map[label] for label in all_pred_y_test]
 	report_score(simple_y_str, pred_y_stances_str)
+
+	saver.save(model.session,'/tmp/' + model_path) 
 
 if __name__ == '__main__':
 	main()

@@ -6,7 +6,7 @@ from word_embeddings import WordEmbeddings
 from sklearn import metrics
 from fnc_1_baseline_master.utils.dataset import DataSet
 from fnc_1_baseline_master.utils.generate_test_splits import kfold_split, get_stances_for_folds
-from fnc_1_baseline_master.feature_engineering import refuting_features, polarity_features, hand_features, gen_or_load_feats, word_overlap_features, discuss_features, get_sentiment_difference
+from fnc_1_baseline_master.feature_engineering import refuting_features, polarity_features, hand_features, gen_or_load_feats, word_overlap_features, discuss_features, get_sentiment_difference, get_tfidf
 from fnc_1_baseline_master.utils.score import report_score, LABELS, score_submission
 from fnc_1_baseline_master.utils.system import parse_params, check_version
 
@@ -144,15 +144,15 @@ def generate_features(stances,dataset,name):
     X_hand = gen_or_load_feats(hand_features, h, b, "fnc_1_baseline_master/features/hand."+name+".npy")
     X_discuss = gen_or_load_feats(discuss_features, h, b, "fnc_1_baseline_master/features/discuss."+name+".npy")
     X_vader_sentiment = gen_or_load_feats(get_sentiment_difference, h, b, "fnc_1_baseline_master/features/vader_sentiment."+name+".npy")
-    #X_tfidf_headline, X_tfidf_bodies = gen_or_load_feats(get_tfidf, h, b, "fnc_1_baseline_master/features/tfidf."+name+".npy")
+    X_tfidf_headline, X_tfidf_bodies = gen_or_load_feats(get_tfidf, h, b, "fnc_1_baseline_master/features/tfidf."+name+".npy")
     #print(X_hand.shape)
-    #print(X_discuss.shape)
-    #print(X_vader_sentiment.shape)
-    #print(X_tfidf_headline.shape)
-    #print(X_tfidf_bodies.shape)
+    print("X_discuss: " + str(X_discuss.shape))
+    print("X_vader: " + str(X_vader_sentiment.shape))
+    print("X_tfidf_h: " + str(X_tfidf_headline.shape))
+    print("X_tfidf_b: " + str(X_tfidf_bodies.shape))
 
     X = np.c_[X_hand, X_polarity, X_refuting, X_overlap]
-    #print(X.shape)
+    print("X: " + X.shape)
     #X = X.reshape(len(y), 44, 1)
     #y = np.asarray(y).reshape(len(y), 1, 1)
 
@@ -215,7 +215,7 @@ def main():
 
 	x_global = {}
 	y_global = {}
-
+	
 	for fold in fold_stances:
 		x_headlines[fold], x_articles[fold], y_vals[fold], lengths_h[fold], lengths_a[fold] = get_articles_word_vectors(fold_stances[fold], d, embeddings)
 		x_global[fold], y_global[fold] = generate_features(fold_stances[fold], d, str(fold))

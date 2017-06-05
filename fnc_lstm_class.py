@@ -13,7 +13,7 @@ from fnc_1_baseline_master.utils.system import parse_params, check_version
 model_path = 'lstm_model.ckpt' # for saving the model later
 
 INPUT_SIZE = 100 # length of GLoVe word embeddings
-RNN_HIDDEN = 15
+RNN_HIDDEN = 25
 OUTPUT_SIZE = 4
 HIDDEN_OUTPUT_SIZE = 4
 TINY = 1e-6
@@ -42,19 +42,23 @@ class Classifier(object):
 		with tf.variable_scope('scope1') as scope1:  
 			# Create cell
 			self.cell_articles_fw = tf.contrib.rnn.BasicLSTMCell(RNN_HIDDEN, state_is_tuple=True)
-			self.cell_articles_fw = tf.contrib.rnn.core_rnn_cell.DropoutWrapper(self.cell_articles_fw, input_keep_prob=0.7, output_keep_prob=0.2)
+			self.cell_articles_fw = tf.contrib.rnn.core_rnn_cell.DropoutWrapper(self.cell_articles_fw, input_keep_prob=1.0, output_keep_prob=0.2)
+
 			self.cell_articles_fw = tf.contrib.rnn.AttentionCellWrapper(self.cell_articles_fw, window, state_is_tuple=True)
+
 			self.cell_articles_bw = tf.contrib.rnn.BasicLSTMCell(RNN_HIDDEN, state_is_tuple=True)
-			self.cell_articles_bw = tf.contrib.rnn.core_rnn_cell.DropoutWrapper(self.cell_articles_bw, input_keep_prob=0.7, output_keep_prob=0.2)
+			self.cell_articles_bw = tf.contrib.rnn.core_rnn_cell.DropoutWrapper(self.cell_articles_bw, input_keep_prob=1.0, output_keep_prob=0.2)
+
 			self.cell_articles_bw = tf.contrib.rnn.AttentionCellWrapper(self.cell_articles_bw, window, state_is_tuple=True)
+
 			self.rnn_outputs_articles, self.rnn_states_articles = 	tf.nn.bidirectional_dynamic_rnn(self.cell_articles_fw, self.cell_articles_bw, self.inputs_articles, dtype=tf.float32)
 			# Initialize batch size, initial states
-			'''
-			batch_size_articles= tf.shape(self.inputs_articles)[0]
-			initial_state_articles = self.cell_articles.zero_state(batch_size_articles, tf.float32)
+			
+			# batch_size_articles= tf.shape(self.inputs_articles)[0]
+			# initial_state_articles = self.cell_articles_fw.zero_state(batch_size_articles, tf.float32)
 			# Hidden states, outputs
-			self.rnn_outputs_articles, self.rnn_states_articles = tf.nn.dynamic_rnn(self.cell_articles, self.inputs_articles, initial_state=initial_state_articles, time_major=False)
-			'''
+			# self.rnn_outputs_articles, self.rnn_states_articles = tf.nn.dynamic_rnn(self.cell_articles, self.inputs_articles, initial_state=initial_state_articles, time_major=False)
+
 		with tf.variable_scope('scope1') as scope1:
 			scope1.reuse_variables() 
 			# Create cell
@@ -65,6 +69,8 @@ class Classifier(object):
 			self.cell_headlines_bw = tf.contrib.rnn.core_rnn_cell.DropoutWrapper(self.cell_headlines_bw, input_keep_prob=0.7, output_keep_prob=0.2) 
 			self.cell_headlines_bw = tf.contrib.rnn.AttentionCellWrapper(self.cell_headlines_bw, window, state_is_tuple=True, reuse=True)
 			self.rnn_outputs_headlines, self.rnn_states_headlines = tf.nn.bidirectional_dynamic_rnn(self.cell_headlines_fw, self.cell_headlines_bw, self.inputs_headlines, dtype=tf.float32)
+			
+			# self.rnn_outputs_headlines, self.rnn_states_headlines = tf.nn.bidirectional_dynamic_rnn(self.cell_headlines_fw, self.cell_headlines_bw, self.inputs_headlines, initial_state_fw=self.rnn_states_articles_attention[0], initial_state_bw=self.rnn_states_articles_attention[1], dtype=tf.float32)
 			'''
 			# Initialize batch size, initial states
 			batch_size_headlines= tf.shape(self.inputs_headlines)[0]
@@ -80,7 +86,7 @@ class Classifier(object):
 
 		self.rnn_outputs = tf.concat([out1, out2, out3, out4, self.global_feats], 1)
 		# self.rnn_outputs = tf.concat([self.rnn_outputs_articles[0], self.rnn_outputs_articles[1], self.rnn_outputs_headlines[0], self.rnn_outputs_headlines[1]], 1)
-		self.final_projection = layers.fully_connected(self.rnn_outputs, num_outputs=HIDDEN_OUTPUT_SIZE, activation_fn=tf.nn.sigmoid)
+		self.final_projection = layers.fully_connected(self.rnn_outputs, num_outputs=HIDDEN_OUTPUT_SIZE)
 		self.pred_stance = tf.argmax(self.final_projection, 1)
 		#self.softmaxes = tf.nn.softmax(final_projection[0:, 0:])
 
@@ -274,7 +280,7 @@ def main():
 		fold_error = 0
 		print('Training fold ' + str(fold))
 		j = 0
-		for epoch in range(3): #(5):
+		for epoch in range(1):# (5):
 			
 			'''
 			# Training batches
@@ -304,7 +310,12 @@ def main():
 				j += 1
 
 		print('Training error (fold) = ' + str(fold_error / j) + '\n')
-		
+		'''print('LSTM Cell Weights')
+		print('\tFW articles ' + str(model.session.run(model.cell_articles_fw.weights)))	
+		print('\tBW articles ' + str(model.session.run(model.cell_articles_bw.weights)))
+		print('\tFW headlines ' + str(model.session.run(model.cell_headlines_fw.weights)))
+		print('\tBW headlines ' + str(model.session.run(model.cell_headlines_bw.weights)))
+		'''
 		# Validation batches
 		article_batches_valid,headline_batches_valid,output_batches_valid,length_h_batches_valid,length_a_batches_valid, global_batches_valid = create_batches(x_valid_articles, 
 		x_valid_headlines, 

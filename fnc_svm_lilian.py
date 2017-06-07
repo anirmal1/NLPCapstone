@@ -6,7 +6,7 @@ from word_embeddings import WordEmbeddings
 from sklearn import metrics
 from scipy.sparse import vstack, hstack
 from fnc_1_baseline_master.utils.dataset import DataSet
-from fnc_1_baseline_master.utils.generate_test_splits import kfold_split, get_stances_for_folds
+from fnc_1_baseline_master.utils.generate_test_splits import kfold_split, get_stances_for_folds, get_stances_for_folds2
 from fnc_1_baseline_master.feature_engineering import refuting_features, polarity_features, hand_features, gen_or_load_feats, word_overlap_features, discuss_features, get_sentiment_difference, get_tfidf
 from fnc_1_baseline_master.utils.score import report_score, LABELS, score_submission
 from fnc_1_baseline_master.utils.system import parse_params, check_version
@@ -44,12 +44,12 @@ class Classifier(object):
 		with tf.variable_scope('scope1') as scope1:  
 			# Create cell
 			self.cell_articles_fw = tf.contrib.rnn.BasicLSTMCell(RNN_HIDDEN, state_is_tuple=True)
-			self.cell_articles_fw = tf.contrib.rnn.core_rnn_cell.DropoutWrapper(self.cell_articles_fw, input_keep_prob=0.7, output_keep_prob=0.2)
-			self.cell_articles_fw = tf.contrib.rnn.AttentionCellWrapper(self.cell_articles_fw, window, state_is_tuple=True)
+			self.cell_articles_fw = tf.contrib.rnn.core_rnn_cell.DropoutWrapper(self.cell_articles_fw, input_keep_prob=0.3, output_keep_prob=0.6)
+			#self.cell_articles_fw = tf.contrib.rnn.AttentionCellWrapper(self.cell_articles_fw, window, state_is_tuple=True)
 
 			self.cell_articles_bw = tf.contrib.rnn.BasicLSTMCell(RNN_HIDDEN, state_is_tuple=True)
-			self.cell_articles_bw = tf.contrib.rnn.core_rnn_cell.DropoutWrapper(self.cell_articles_bw, input_keep_prob=0.7, output_keep_prob=0.2)
-			self.cell_articles_bw = tf.contrib.rnn.AttentionCellWrapper(self.cell_articles_bw, window, state_is_tuple=True)
+			self.cell_articles_bw = tf.contrib.rnn.core_rnn_cell.DropoutWrapper(self.cell_articles_bw, input_keep_prob=0.3, output_keep_prob=0.6)
+			#self.cell_articles_bw = tf.contrib.rnn.AttentionCellWrapper(self.cell_articles_bw, window, state_is_tuple=True)
 
 			self.rnn_outputs_articles, self.rnn_states_articles = 	tf.nn.bidirectional_dynamic_rnn(self.cell_articles_fw, self.cell_articles_bw, self.inputs_articles, dtype=tf.float32)
 			# Initialize batch size, initial states
@@ -63,8 +63,8 @@ class Classifier(object):
 			scope1.reuse_variables() 
 			# Create cell
 			self.cell_headlines_fw = tf.contrib.rnn.BasicLSTMCell(RNN_HIDDEN, state_is_tuple=True, reuse=True)
-			self.cell_headlines_fw = tf.contrib.rnn.core_rnn_cell.DropoutWrapper(self.cell_headlines_fw, input_keep_prob=0.7, output_keep_prob=0.2) 
-			self.cell_headlines_fw = tf.contrib.rnn.AttentionCellWrapper(self.cell_headlines_fw, window, state_is_tuple=True, reuse=True)
+			self.cell_headlines_fw = tf.contrib.rnn.core_rnn_cell.DropoutWrapper(self.cell_headlines_fw, input_keep_prob=0.3, output_keep_prob=0.7) 
+			#self.cell_headlines_fw = tf.contrib.rnn.AttentionCellWrapper(self.cell_headlines_fw, window, state_is_tuple=True, reuse=False)
 
 			self.cell_headlines_bw = tf.contrib.rnn.BasicLSTMCell(RNN_HIDDEN, state_is_tuple=True, reuse=True)
 			self.rnn_outputs_headlines, self.rnn_states_headlines = tf.nn.bidirectional_dynamic_rnn(self.cell_headlines_fw, self.cell_headlines_bw, self.inputs_headlines, dtype=tf.float32)
@@ -210,7 +210,7 @@ def create_batches(x_articles, x_headlines, y, lengths_h, lengths_a, global_feat
 def main():
 	d = DataSet()
 	folds, hold_out = kfold_split(d, n_folds=10)
-	fold_stances, hold_out_stances = get_stances_for_folds(d, folds, hold_out)
+	fold_stances, hold_out_stances, hold_out_stances_small = get_stances_for_folds2(d, folds, hold_out)
 	embeddings = WordEmbeddings()
 	print('Created data set and word embeddings')
 	
@@ -234,6 +234,9 @@ def main():
 
 	test_x_headlines, test_x_articles, test_y, test_h_lengths, test_a_lengths = get_articles_word_vectors(hold_out_stances, d, embeddings)
 	test_x_global, test_y_global = generate_features(hold_out_stances, d, 'holdout')
+	
+	test_x_headlines_small, test_x_articles_small, test_y_small, test_h_lengths_small, test_a_lengths_small = get_articles_word_vectors(hold_out_stances_small, d, embeddings)
+	test_x_global_small, test_y_global_small = generate_features(hold_out_stances_small, d, 'holdout')
 	print('Finished separating folds')
 	
 	# train LSTM (fold -> epoch -> batch)
@@ -269,7 +272,6 @@ def main():
 		  else:
 		    y_train_round1.append(1)
 		y_train_round1 = np.array(y_train_round1)
-		print("y_train len: " + str(len(y_train)))
 
 		X_valid = global_valid
 		y_valid_round1 = []
@@ -293,10 +295,6 @@ def main():
 		round1_score = 1.0 * round1_score / len(round1_pred)
 		print('round 1 score: ' + str(round1_score))
 		
-		# Get related article IDs for y_valid_round1
-		related_ids = [i for i in y_valid_round1 if y_valid_round1[i] == 1]
-		print("related_ids len: " + str(len(related_ids)))
-
 		# REFORMAT FOR BILSTM
 		# Reformat y_train so it only has related labels (now only 3 labels)
 		y_train_round2 = []
@@ -319,7 +317,8 @@ def main():
 		fold_error = 0
 		print('Training fold ' + str(fold))
 		j = 0
-		for epoch in range(5):
+		#NOTE: Change epoch back to 5!!
+		for epoch in range(1):
 			
 			# Training batches
 			article_batches_train,headline_batches_train,output_batches_train,length_h_batches_train,length_a_batches_train, global_batches_train= create_batches(x_train_articles, 
@@ -394,10 +393,50 @@ def main():
 	# assess performance on test set
 	print('\n#### RUNNING ON HOLDOUT SET ####')
 
+	# Reformat yvals for round1
+	y_test_round1 = []
+	for item in test_y:
+	  if item[3] == 1:
+	    y_test_round1.append(0)
+	  else:
+	    y_test_round1.append(1)
+	y_test_round1 = np.array(y_test_round1)
+	
+	y_test_small_round1 = []
+	for item in test_y_small:
+	  if item[3] == 1:
+	    y_test_small_round1.append(0)
+	  else:
+	    y_test_small_round1.append(1)
+	y_test_small_round1 = np.array(y_test_small_round1)
+
+	# ROUND 1 TESTING
+	clf2 = svm.SVC() 
+	# NOTE: Train on valid because it's a smaller set
+	# Want to use train set in LSTM
+	clf2.fit(test_x_articles_small, y_test_small_round1)
+
+	round1_pred = clf2.predict(test_x_articles)
+	round1_score = 0
+	for i in range(len(round1_pred)):
+	  if round1_pred[i] == y_test_round1[i]:
+	    round1_score += 1
+	round1_score = 1.0 * round1_score / len(round1_pred)
+	print('round 1 score: ' + str(round1_score))
+	
+	# REFORMAT FOR BILSTM
+	y_test_round2 = []
+	for index, label in enumerate(round1_pred):
+		if label == 1:
+			y_test_round2.append(test_y[index][:-1])
+		# If unrelated, append as all 0's
+		else:
+			y_test_round2.append([0, 0, 0])
+
 	# Test batches
 	article_batches_test,headline_batches_test,output_batches_test,length_h_batches_test,length_a_batches_test,global_batches_test = create_batches(test_x_articles, 
 	test_x_headlines, 
-	test_y, 
+	y_test_round2, 
 	test_h_lengths, 
 	test_a_lengths, 
 	test_x_global)
@@ -414,16 +453,27 @@ def main():
 			})
 		all_pred_y_test = np.append(all_pred_y_test, pred_y_stances)
 
+	# Merge related and unrelated labels together for final prediction
+	final_pred = []
+	all_pred_count = 0
+	for label in y_test_round1:
+		# If unrelated
+		if label == 0:
+			final_pred.append(3)
+		else:
+			final_pred.append(all_pred_y_test[all_pred_count])
+			all_pred_count += 1
+	
 	simple_y = np.array([array.tolist().index(1) for array in test_y])
-	f1_score = metrics.f1_score(simple_y, all_pred_y_test, average='macro')
+	f1_score = metrics.f1_score(simple_y, final_pred, average='macro')
 	print("F1 MEAN score: " + str(f1_score))
-	f1_score_labels =  metrics.f1_score(simple_y, all_pred_y_test, labels=[0, 1, 2, 3], average=None)
+	f1_score_labels =  metrics.f1_score(simple_y, final_pred, labels=[0, 1, 2, 3], average=None)
 	print("F1 LABEL scores: " + str(f1_score_labels))
 
 	# Convert to string labels for FNC scoring metric
 	label_map = {0 : "agree", 1 : "disagree", 2 : "discuss", 3 : "unrelated"}
 	simple_y_str = [label_map[label] for label in simple_y]
-	pred_y_stances_str = [label_map[label] for label in all_pred_y_test]
+	pred_y_stances_str = [label_map[label] for label in final_pred]
 	report_score(simple_y_str, pred_y_stances_str)
 
 if __name__ == '__main__':

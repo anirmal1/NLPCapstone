@@ -90,21 +90,21 @@ def main():
 			while True:
 				headline = input('Headline? ')
 				article = input('Article? ')
-				true_label = input('True label? ')
+				# dummy value
+				true_label = 'discuss' #input('True label? ')
 
 				h, a, t, l_h, l_a = get_articles_word_vectors(headline, article, true_label, embeddings)
 				g_f = generate_features(headline, article)
 
-				pred_stances = session.run([model.pred_stance, model.train_fn], {
+				pred_stances = session.run([model.pred_stance], {
 					model.inputs_articles: a,
 					model.inputs_headlines: h,
 					model.outputs: t, 
 					model.h_lengths: l_h,
 					model.a_lengths: l_a,
 					model.global_feats: g_f
-				})[0]
-
-				print('predicted label = ' + str(LABELS[pred_stances[0]]) + '\n')
+				})
+				print('predicted label = ' + str(LABELS[pred_stances[0][0]]) + '\n')
 
 if __name__ == '__main__':
 	main()

@@ -5,17 +5,18 @@ import numpy as np
 import tensorflow.contrib.layers as layers
 from fnc_1_baseline_master.feature_engineering import refuting_features, polarity_features, hand_features, gen_or_load_feats, word_overlap_features, discuss_features, get_sentiment_difference
 import random
-
-# Some constants
-INPUT_SIZE = 100
-OUTPUT_SIZE = 4
-RNN_HIDDEN = 10
-HIDDEN_OUTPUT_SIZE = 4
-TINY = 1e-6
-LEARNING_RATE = 0.01
+from fnc_lstm_class import Classifier
 
 model_path = 'lstm_model.ckpt'
 
+INPUT_SIZE = 100 # length of GLoVe word embeddings
+RNN_HIDDEN = 25
+OUTPUT_SIZE = 4
+HIDDEN_OUTPUT_SIZE = 4
+TINY = 1e-6
+LEARNING_RATE = 0.001
+BATCH_SIZE = 1024
+'''
 class Classifier(object):
 	def __init__(self):
 		self.session = tf.Session()
@@ -74,11 +75,7 @@ class Classifier(object):
 		
 		# accuracy TODO what is this even doing...
 		#self.accuracy = tf.reduce_mean(tf.cast(tf.abs(self.outputs - final_projection) < 0.5, tf.float32))
-
-
-
-
-
+'''
 
 def get_articles_word_vectors(h_, b_, t, word_embeddings):
 	y = []
@@ -140,37 +137,43 @@ def generate_features(h, b):
 
 def main():
 	print('Starting test model...')
-	session = tf.Session()
-	# saver = tf.train.Saver(tf.all_variables())
-	model = Classifier()
-	saver = tf.train.import_meta_graph(model_path + '.meta')
-	saver.restore(session, save_path=model_path)
-	model.session.run(tf.global_variables_initializer())
-	print('Model restored.')
 
-	print(tf.all_variables())
+	with tf.Graph().as_default() as g:
+		#session = tf.Session()
+		with tf.Session() as session:
+			# saver = tf.train.Saver(tf.all_variables())
+			model = Classifier()
+			# model.session.run(tf.global_variables_initializer())
+			saver = tf.train.import_meta_graph(model_path + '.meta')
+			saver.restore(model.session, save_path='/tmp/' + model_path)
+			# model.session.run(tf.global_variables_initializer())
+			print('Model restored.')
+
+			# print([v.op.name for v in tf.all_variables()])
+		
+			# print(model.session.run())
 	
-	# TODO complete this portion (feed in our own data, command line interface)
-	embeddings = WordEmbeddings()
-	
-	while True:
-		headline = input('Headline? ')
-		article = input('Article? ')
-		true_label = input('True label? ')
+			# TODO complete this portion (feed in our own data, command line interface)
+			embeddings = WordEmbeddings()
+			
+			while True:
+				headline = input('Headline? ')
+				article = input('Article? ')
+				true_label = input('True label? ')
 
-		h, a, t, l_h, l_a = get_articles_word_vectors(headline, article, true_label, embeddings)
-		g_f = generate_features(headline, article)
+				h, a, t, l_h, l_a = get_articles_word_vectors(headline, article, true_label, embeddings)
+				g_f = generate_features(headline, article)
 
-		pred_stances = model.session.run([model.pred_stance, model.train_fn], {
-			model.inputs_articles: a,  # INSERT EMBEDDING
-			model.inputs_headlines: h, # INSERT EMBEDDING
-			model.outputs: t, # INSERT EMBEDDING
-			model.h_lengths: l_h,
-			model.a_lengths: l_a,
-			model.global_feats: g_f
-		})[0]
+				pred_stances = model.session.run([model.pred_stance, model.train_fn], {
+					model.inputs_articles: a,  # INSERT EMBEDDING
+					model.inputs_headlines: h, # INSERT EMBEDDING
+					model.outputs: t, # INSERT EMBEDDING
+					model.h_lengths: l_h,
+					model.a_lengths: l_a,
+					model.global_feats: g_f
+				})[0]
 
-		print('predicted label = ' + str(LABELS[pred_stances[0]]) + '\n')
+				print('predicted label = ' + str(LABELS[pred_stances[0]]) + '\n')
 
 if __name__ == '__main__':
 	main()

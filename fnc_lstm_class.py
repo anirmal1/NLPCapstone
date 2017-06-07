@@ -14,11 +14,11 @@ from fnc_1_baseline_master.utils.system import parse_params, check_version
 model_path = 'lstm_model.ckpt' # for saving the model later
 
 INPUT_SIZE = 100 # length of GLoVe word embeddings
-RNN_HIDDEN = 100
+RNN_HIDDEN = 25
 OUTPUT_SIZE = 4
 HIDDEN_OUTPUT_SIZE = 4
 TINY = 1e-6
-LEARNING_RATE = 0.0001
+LEARNING_RATE = 0.001
 BATCH_SIZE = 1024
 
 ################################################################################
@@ -27,68 +27,84 @@ BATCH_SIZE = 1024
 
 class Classifier(object):
 	def __init__(self):
-		self.session = tf.Session()
+		self.graph = tf.Graph()
+		self.session = tf.Session(graph=self.graph)
 
-		# input/output placeholders
-		self.inputs_articles = tf.placeholder(tf.float32, (None, 200, INPUT_SIZE), name='input_articles')
-		self.inputs_headlines = tf.placeholder(tf.float32, (None, 30, INPUT_SIZE), name='inputs_headlines')	
-		self.outputs = tf.placeholder(tf.float32, (None, OUTPUT_SIZE), name='outputs') # TODO change to two dimensions
-		self.h_lengths = tf.placeholder(tf.int32, (None, 2))
-		self.a_lengths = tf.placeholder(tf.int32, (None, 2))
-		self.global_feats = tf.placeholder(tf.float32, (None, 50))
+		with self.graph.as_default():
+			# input/output placeholders
+			self.inputs_articles = tf.placeholder(tf.float32, (None, 200, INPUT_SIZE), name='input_articles')
+			self.inputs_headlines = tf.placeholder(tf.float32, (None, 30, INPUT_SIZE), name='inputs_headlines')	
+			self.outputs = tf.placeholder(tf.float32, (None, OUTPUT_SIZE), name='outputs') # TODO change to two dimensions
+			self.h_lengths = tf.placeholder(tf.int32, (None, 2))
+			self.a_lengths = tf.placeholder(tf.int32, (None, 2))
+			self.global_feats = tf.placeholder(tf.float32, (None, 50))
 
-		# LSTM cells, TODO make these bidrectional!
-		with tf.variable_scope('scope1') as scope1:  
-			# Create cell
-			self.cell_articles_fw = tf.contrib.rnn.BasicLSTMCell(RNN_HIDDEN, state_is_tuple=True)
-			self.cell_articles_fw = tf.contrib.rnn.core_rnn_cell.DropoutWrapper(self.cell_articles_fw, input_keep_prob=0.7, output_keep_prob=0.2)
-			self.cell_articles_bw = tf.contrib.rnn.BasicLSTMCell(RNN_HIDDEN, state_is_tuple=True)
-			self.cell_articles_bw = tf.contrib.rnn.core_rnn_cell.DropoutWrapper(self.cell_articles_bw, input_keep_prob=0.7, output_keep_prob=0.2)
-			self.rnn_outputs_articles, self.rnn_states_articles = 	tf.nn.bidirectional_dynamic_rnn(self.cell_articles_fw, self.cell_articles_bw, self.inputs_articles, dtype=tf.float32)
-			# Initialize batch size, initial states
-			'''
-			batch_size_articles= tf.shape(self.inputs_articles)[0]
-			initial_state_articles = self.cell_articles.zero_state(batch_size_articles, tf.float32)
-			# Hidden states, outputs
-			self.rnn_outputs_articles, self.rnn_states_articles = tf.nn.dynamic_rnn(self.cell_articles, self.inputs_articles, initial_state=initial_state_articles, time_major=False)
-			'''
-		with tf.variable_scope('scope1') as scope1:
-			scope1.reuse_variables() 
-			# Create cell
-			self.cell_headlines_fw = tf.contrib.rnn.BasicLSTMCell(RNN_HIDDEN, state_is_tuple=True, reuse=True)
-			self.cell_headlines_fw = tf.contrib.rnn.core_rnn_cell.DropoutWrapper(self.cell_headlines_fw, input_keep_prob=0.7, output_keep_prob=0.2) 
-			self.cell_headlines_bw = tf.contrib.rnn.BasicLSTMCell(RNN_HIDDEN, state_is_tuple=True, reuse=True)
-			self.cell_headlines_bw = tf.contrib.rnn.core_rnn_cell.DropoutWrapper(self.cell_headlines_bw, input_keep_prob=0.7, output_keep_prob=0.2) 
-			self.rnn_outputs_headlines, self.rnn_states_headlines = tf.nn.bidirectional_dynamic_rnn(self.cell_headlines_fw, self.cell_headlines_bw, self.inputs_headlines, dtype=tf.float32)
-			'''
-			# Initialize batch size, initial states
-			batch_size_headlines= tf.shape(self.inputs_headlines)[0]
-			initial_state_headlines = self.rnn_states_articles 
-			# Hidden states, outputs
-			self.rnn_outputs_headlines, self.rnn_states_headlines = tf.nn.dynamic_rnn(self.cell_headlines, self.inputs_headlines, initial_state=initial_state_headlines, time_major=False)
-			'''
-		# make prediction
-		out1 = tf.gather_nd(self.rnn_outputs_articles[0], self.a_lengths)
-		out2 = tf.gather_nd(self.rnn_outputs_articles[1], self.a_lengths)
-		out3 = tf.gather_nd(self.rnn_outputs_headlines[0], self.h_lengths)
-		out4 = tf.gather_nd(self.rnn_outputs_headlines[1], self.h_lengths)
+			window = 4
 
-		self.rnn_outputs = tf.concat([out1, out2, out3, out4, self.global_feats], 1)
-		# self.rnn_outputs = tf.concat([self.rnn_outputs_articles[0], self.rnn_outputs_articles[1], self.rnn_outputs_headlines[0], self.rnn_outputs_headlines[1]], 1)
-		self.final_projection = layers.fully_connected(self.rnn_outputs, num_outputs=HIDDEN_OUTPUT_SIZE, activation_fn=tf.nn.sigmoid)
-		self.pred_stance = tf.argmax(self.final_projection, 1)
-		#self.softmaxes = tf.nn.softmax(final_projection[0:, 0:])
+			# LSTM cells, TODO make these bidrectional!
+			with tf.variable_scope('scope1') as scope1:  
+				# Create cell
+				self.cell_articles_fw = tf.contrib.rnn.BasicLSTMCell(RNN_HIDDEN, state_is_tuple=True)
+				self.cell_articles_fw = tf.contrib.rnn.core_rnn_cell.DropoutWrapper(self.cell_articles_fw, input_keep_prob=1.0, output_keep_prob=0.2)
 
-		# cross entropy loss TODO compute cross entropy between softmax and expected output (a one-hot vector)
-		#self.error = -(self.outputs * tf.log(self.softmaxes + TINY) + (1.0 - self.outputs) * tf.log(1.0 - self.softmaxes + TINY))
-		# self.error = -(self.outputs * tf.log(predicted_outputs + TINY) + (1.0 - self.outputs) * tf.log(1.0 - predicted_outputs + TINY))
-		#self.error = tf.reduce_mean(self.error)
-		self.error = tf.nn.softmax_cross_entropy_with_logits(labels=self.outputs, logits=self.final_projection)
-		self.error = tf.reduce_mean(self.error)
-		self.train_fn = tf.train.AdamOptimizer(learning_rate=LEARNING_RATE, name='train_fn').minimize(self.error)
-		
-		# accuracy TODO what is this even doing...
-		#self.accuracy = tf.reduce_mean(tf.cast(tf.abs(self.outputs - final_projection) < 0.5, tf.float32))
+				self.cell_articles_fw = tf.contrib.rnn.AttentionCellWrapper(self.cell_articles_fw, window, state_is_tuple=True)
+
+				self.cell_articles_bw = tf.contrib.rnn.BasicLSTMCell(RNN_HIDDEN, state_is_tuple=True)
+				self.cell_articles_bw = tf.contrib.rnn.core_rnn_cell.DropoutWrapper(self.cell_articles_bw, input_keep_prob=1.0, output_keep_prob=0.2)
+
+				self.cell_articles_bw = tf.contrib.rnn.AttentionCellWrapper(self.cell_articles_bw, window, state_is_tuple=True)
+
+				self.rnn_outputs_articles, self.rnn_states_articles = 	tf.nn.bidirectional_dynamic_rnn(self.cell_articles_fw, self.cell_articles_bw, self.inputs_articles, dtype=tf.float32)
+				# Initialize batch size, initial states
+				
+				# batch_size_articles= tf.shape(self.inputs_articles)[0]
+				# initial_state_articles = self.cell_articles_fw.zero_state(batch_size_articles, tf.float32)
+				# Hidden states, outputs
+				# self.rnn_outputs_articles, self.rnn_states_articles = tf.nn.dynamic_rnn(self.cell_articles, self.inputs_articles, initial_state=initial_state_articles, time_major=False)
+
+			with tf.variable_scope('scope1') as scope1:
+				scope1.reuse_variables() 
+				# Create cell
+				self.cell_headlines_fw = tf.contrib.rnn.BasicLSTMCell(RNN_HIDDEN, state_is_tuple=True, reuse=True)
+				self.cell_headlines_fw = tf.contrib.rnn.core_rnn_cell.DropoutWrapper(self.cell_headlines_fw, input_keep_prob=0.7, output_keep_prob=0.2)
+				self.cell_headlines_fw = tf.contrib.rnn.AttentionCellWrapper(self.cell_headlines_fw, window, state_is_tuple=True, reuse=True) 
+				self.cell_headlines_bw = tf.contrib.rnn.BasicLSTMCell(RNN_HIDDEN, state_is_tuple=True, reuse=True)
+				self.cell_headlines_bw = tf.contrib.rnn.core_rnn_cell.DropoutWrapper(self.cell_headlines_bw, input_keep_prob=0.7, output_keep_prob=0.2) 
+				self.cell_headlines_bw = tf.contrib.rnn.AttentionCellWrapper(self.cell_headlines_bw, window, state_is_tuple=True, reuse=True)
+				self.rnn_outputs_headlines, self.rnn_states_headlines = tf.nn.bidirectional_dynamic_rnn(self.cell_headlines_fw, self.cell_headlines_bw, self.inputs_headlines, dtype=tf.float32)
+				
+				# self.rnn_outputs_headlines, self.rnn_states_headlines = tf.nn.bidirectional_dynamic_rnn(self.cell_headlines_fw, self.cell_headlines_bw, self.inputs_headlines, initial_state_fw=self.rnn_states_articles_attention[0], initial_state_bw=self.rnn_states_articles_attention[1], dtype=tf.float32)
+				'''
+				# Initialize batch size, initial states
+				batch_size_headlines= tf.shape(self.inputs_headlines)[0]
+				initial_state_headlines = self.rnn_states_articles 
+				# Hidden states, outputs
+				self.rnn_outputs_headlines, self.rnn_states_headlines = tf.nn.dynamic_rnn(self.cell_headlines, self.inputs_headlines, initial_state=initial_state_headlines, time_major=False)
+				'''
+			# make prediction
+			out1 = tf.gather_nd(self.rnn_outputs_articles[0], self.a_lengths)
+			out2 = tf.gather_nd(self.rnn_outputs_articles[1], self.a_lengths)
+			out3 = tf.gather_nd(self.rnn_outputs_headlines[0], self.h_lengths)
+			out4 = tf.gather_nd(self.rnn_outputs_headlines[1], self.h_lengths)
+
+			self.rnn_outputs = tf.concat([out1, out2, out3, out4, self.global_feats], 1)
+			# self.rnn_outputs = tf.concat([self.rnn_outputs_articles[0], self.rnn_outputs_articles[1], self.rnn_outputs_headlines[0], self.rnn_outputs_headlines[1]], 1)
+			self.final_projection = layers.fully_connected(self.rnn_outputs, num_outputs=HIDDEN_OUTPUT_SIZE)
+			self.pred_stance = tf.argmax(self.final_projection, 1)
+			#self.softmaxes = tf.nn.softmax(final_projection[0:, 0:])
+
+			# cross entropy loss TODO compute cross entropy between softmax and expected output (a one-hot vector)
+			#self.error = -(self.outputs * tf.log(self.softmaxes + TINY) + (1.0 - self.outputs) * tf.log(1.0 - self.softmaxes + TINY))
+			# self.error = -(self.outputs * tf.log(predicted_outputs + TINY) + (1.0 - self.outputs) * tf.log(1.0 - predicted_outputs + TINY))
+			#self.error = tf.reduce_mean(self.error)
+			self.error = tf.nn.softmax_cross_entropy_with_logits(labels=self.outputs, logits=self.final_projection)
+			self.error = tf.reduce_mean(self.error)
+			self.train_fn = tf.train.AdamOptimizer(learning_rate=LEARNING_RATE, name='train_fn').minimize(self.error)
+			
+			self.session.run(tf.initialize_all_variables())
+			# accuracy TODO what is this even doing...
+			#self.accuracy = tf.reduce_mean(tf.cast(tf.abs(self.outputs - final_projection) < 0.5, tf.float32))
+
 
 
 ################################################################################
@@ -209,150 +225,196 @@ def main():
 	fold_stances, hold_out_stances = get_stances_for_folds(d, folds, hold_out)
 	embeddings = WordEmbeddings()
 	print('Created data set and word embeddings')
-	
+
+	# with tf.Graph().as_default() as g:	
 	# create classifier
 	model = Classifier()
 	print('Set up model')
-	
-	# get word vector data
-	x_articles = {}
-	x_headlines = {}
-	y_vals = {}
-	lengths_a = {}
-	lengths_h = {}
 
-	x_global = {}
-	y_global = {}
-	
-	for fold in fold_stances:
-		x_headlines[fold], x_articles[fold], y_vals[fold], lengths_h[fold], lengths_a[fold] = get_articles_word_vectors(fold_stances[fold], d, embeddings)
-		x_global[fold], y_global[fold] = generate_features(fold_stances[fold], d, str(fold))
+	with model.graph.as_default():
+		# get word vector data
+		x_articles = {}
+		x_headlines = {}
+		y_vals = {}
+		lengths_a = {}
+		lengths_h = {}
 
-	test_x_headlines, test_x_articles, test_y, test_h_lengths, test_a_lengths = get_articles_word_vectors(hold_out_stances, d, embeddings)
-	test_x_global, test_y_global = generate_features(hold_out_stances, d, 'holdout')
-	print('Finished separating folds')
-	
-	# train LSTM (fold -> epoch -> batch)
-	model.session.run(tf.global_variables_initializer())
+		x_global = {}
+		y_global = {}
 
-	for fold in fold_stances:
-		ids = list(range(len(folds)))
-		del ids[fold]
-		x_train_articles = np.vstack(tuple([x_articles[i] for i in ids]))
-		x_train_headlines = np.vstack(tuple([x_headlines[i] for i in ids]))
-		y_train = np.vstack(tuple([y_vals[i] for i in ids]))
-		lengths_h_train = np.vstack(tuple([lengths_h[i] for i in ids]))
-		lengths_a_train = np.vstack(tuple([lengths_a[i] for i in ids]))
-		global_train = np.vstack(tuple([x_global[i] for i in ids]))
-		# print('train articles shape = ' + str(x_train_articles.shape))
-		# print('train headlines shape = ' + str(x_train_headlines.shape))
-		# print('y train shape = ' + str(y_train.shape))
+		for fold in fold_stances:
+			x_headlines[fold], x_articles[fold], y_vals[fold], lengths_h[fold], lengths_a[fold] = get_articles_word_vectors(fold_stances[fold], d, embeddings)
+			x_global[fold], y_global[fold] = generate_features(fold_stances[fold], d, str(fold))
 
-		x_valid_articles = x_articles[fold]
-		x_valid_headlines = x_headlines[fold]
-		y_valid = y_vals[fold]
-		length_h_valid = lengths_h[fold]
-		length_a_valid = lengths_a[fold]		
-		global_valid = x_global[fold]
+		test_x_headlines, test_x_articles, test_y, test_h_lengths, test_a_lengths = get_articles_word_vectors(hold_out_stances, d, embeddings)
+		test_x_global, test_y_global = generate_features(hold_out_stances, d, 'holdout')
+		print('Finished separating folds')
 
-		fold_error = 0
-		print('Training fold ' + str(fold))
-		j = 0
-		for epoch in range(5):
-			
-			# Training batches
+		# TODO get global feature data
+
+		# train LSTM (fold -> epoch -> batch)
+		# model.session.run(tf.initialize_all_variables())
+		saver = tf.train.Saver(tf.all_variables())
+		'''
+		saver = tf.train.Saver({'cell_articles_fw' : model.cell_articles_fw,
+														'cell_articles_bw' : model.cell_articles_bw,
+														'cell_headlines_fw' : model.cell_headlines_fw,
+														'cell_headlines_bw' : model.cell_headlines_bw
+													})
+		'''
+
+		for fold in fold_stances:
+			ids = list(range(len(folds)))
+			del ids[fold]
+			x_train_articles = np.vstack(tuple([x_articles[i] for i in ids]))
+			x_train_headlines = np.vstack(tuple([x_headlines[i] for i in ids]))
+			y_train = np.vstack(tuple([y_vals[i] for i in ids]))
+			lengths_h_train = np.vstack(tuple([lengths_h[i] for i in ids]))
+			lengths_a_train = np.vstack(tuple([lengths_a[i] for i in ids]))
+			global_train = np.vstack(tuple([x_global[i] for i in ids]))
+			# print('train articles shape = ' + str(x_train_articles.shape))
+			# print('train headlines shape = ' + str(x_train_headlines.shape))
+			# print('y train shape = ' + str(y_train.shape))
+
+			x_valid_articles = x_articles[fold]
+			x_valid_headlines = x_headlines[fold]
+			y_valid = y_vals[fold]
+			length_h_valid = lengths_h[fold]
+			length_a_valid = lengths_a[fold]		
+			global_valid = x_global[fold]
+		# Training batches
 			article_batches_train,headline_batches_train,output_batches_train,length_h_batches_train,length_a_batches_train, global_batches_train = create_batches(x_train_articles, 
-			x_train_headlines, 
-			y_train, 
-			lengths_h_train, 
-			lengths_a_train, 
-			global_train)
+				x_train_headlines, 
+				y_train, 
+				lengths_h_train, 
+				lengths_a_train, 
+				global_train)
+				
+			fold_error = 0
+			print('Training fold ' + str(fold))
+			j = 0
+			for epoch in range(5):
+				
+				'''
+				# Training batches
+				article_batches_train,headline_batches_train,output_batches_train,length_h_batches_train,length_a_batches_train, global_batches_train = create_batches(x_train_articles, 
+				x_train_headlines, 
+				y_train, 
+				lengths_h_train, 
+				lengths_a_train, 
+				global_train)
+				'''
 
-			for i in range(len(article_batches_train)):
-				# Training error
-				epoch_error = model.session.run([model.error, model.train_fn], {
-					model.inputs_articles: article_batches_train[i],
-					model.inputs_headlines: headline_batches_train[i],
-					model.outputs: output_batches_train[i],
-					model.h_lengths: length_h_batches_train[i],
-					model.a_lengths: length_a_batches_train[i],
-					model.global_feats: global_batches_train[i]
-				})[0]
-				print('\tEpoch ' + str(j) + ' error = ' + str(epoch_error))				
+				print(len(article_batches_train))
 
-				fold_error += epoch_error
-				j += 1
+				for i in range(len(article_batches_train)):
+					# Training error
+					epoch_error = model.session.run([model.error, model.train_fn], {
+						model.inputs_articles: article_batches_train[i],
+						model.inputs_headlines: headline_batches_train[i],
+						model.outputs: output_batches_train[i],
+						model.h_lengths: length_h_batches_train[i],
+						model.a_lengths: length_a_batches_train[i],
+						model.global_feats: global_batches_train[i]
+					})[0]
+					print('\tEpoch ' + str(j) + ' error = ' + str(epoch_error))				
 
-		print('Training error (fold) = ' + str(fold_error / j) + '\n')
+					fold_error += epoch_error
+					j += 1
+
+			print('Training error (fold) = ' + str(fold_error / j) + '\n')
+			print('LSTM Cell Weights')
+			print('\tFW articles ' + str(model.rnn_states_articles[0]))	
+			print('\tBW articles ' + str(model.rnn_states_articles[1]))
+			print('\tFW headlines ' + str(model.rnn_states_headlines[0]))
+			print('\tBW headlines ' + str(model.rnn_states_headlines[1]))
+			
+			# Validation batches
+			article_batches_valid,headline_batches_valid,output_batches_valid,length_h_batches_valid,length_a_batches_valid, global_batches_valid = create_batches(x_valid_articles, 
+			x_valid_headlines, 
+			y_valid, 
+			length_h_valid, 
+			length_a_valid, 
+			global_valid)
 		
-		# Validation batches
-		article_batches_valid,headline_batches_valid,output_batches_valid,length_h_batches_valid,length_a_batches_valid, global_batches_valid = create_batches(x_valid_articles, 
-		x_valid_headlines, 
-		y_valid, 
-		length_h_valid, 
-		length_a_valid, 
-		global_valid)
-	
-		all_pred_y_stances = []
-		for i in range(len(article_batches_valid)):
-			# cross-validation error
+			all_pred_y_stances = []
+			for i in range(len(article_batches_valid)):
+				# cross-validation error
+				pred_y_stances = model.session.run([model.pred_stance], {
+						model.inputs_articles: article_batches_valid[i],
+						model.inputs_headlines: headline_batches_valid[i],
+						model.outputs: output_batches_valid[i],
+						model.h_lengths: length_h_batches_valid[i],
+						model.a_lengths: length_a_batches_valid[i],
+						model.global_feats: global_batches_valid[i]
+					})
+				all_pred_y_stances = np.append(all_pred_y_stances, pred_y_stances)
+			
+			simple_y = np.array([array.tolist().index(1) for array in y_valid])
+			'''
+			f1_score = metrics.f1_score(simple_y, pred_y_stances, average='macro')
+			print("F1 MEAN score: " + str(f1_score))
+			f1_score_labels =  metrics.f1_score(simple_y, pred_y_stances, labels=[0, 1, 2, 3], average=None)
+			print("F1 LABEL scores: " + str(f1_score_labels))
+			'''
+			# Convert to string labels for FNC scoring metric
+			label_map = {0 : "agree", 1 : "disagree", 2 : "discuss", 3 : "unrelated"}
+			simple_y_str = [label_map[label] for label in simple_y]
+			pred_y_stances_str = [label_map[label] for label in all_pred_y_stances]
+			report_score(simple_y_str, pred_y_stances_str)
+
+		# assess performance on test set
+		print('\n#### RUNNING ON HOLDOUT SET ####')
+
+		# Test batches
+		article_batches_test,headline_batches_test,output_batches_test,length_h_batches_test,length_a_batches_test,global_batches_test = create_batches(test_x_articles, 
+		test_x_headlines, 
+		test_y, 
+		test_h_lengths, 
+		test_a_lengths, 
+		test_x_global)
+
+		all_pred_y_test = []
+		for i in range(len(article_batches_test)):
 			pred_y_stances = model.session.run([model.pred_stance], {
-					model.inputs_articles: article_batches_valid[i],
-					model.inputs_headlines: headline_batches_valid[i],
-					model.outputs: output_batches_valid[i],
-					model.h_lengths: length_h_batches_valid[i],
-					model.a_lengths: length_a_batches_valid[i],
-					model.global_feats: global_batches_valid[i]
+					model.inputs_articles:  article_batches_test[i],
+					model.inputs_headlines: headline_batches_test[i],
+					model.outputs: output_batches_test[i],
+					model.h_lengths: length_h_batches_test[i],
+					model.a_lengths: length_a_batches_test[i],
+					model.global_feats: global_batches_test[i]
 				})
-			all_pred_y_stances = np.append(all_pred_y_stances, pred_y_stances)
-		
-		simple_y = np.array([array.tolist().index(1) for array in y_valid])
-		'''
-		f1_score = metrics.f1_score(simple_y, pred_y_stances, average='macro')
+			all_pred_y_test = np.append(all_pred_y_test, pred_y_stances)
+
+		simple_y = np.array([array.tolist().index(1) for array in test_y])
+		f1_score = metrics.f1_score(simple_y, all_pred_y_test, average='macro')
 		print("F1 MEAN score: " + str(f1_score))
-		f1_score_labels =  metrics.f1_score(simple_y, pred_y_stances, labels=[0, 1, 2, 3], average=None)
+		f1_score_labels =  metrics.f1_score(simple_y, all_pred_y_test, labels=[0, 1, 2, 3], average=None)
 		print("F1 LABEL scores: " + str(f1_score_labels))
-		'''
+
 		# Convert to string labels for FNC scoring metric
 		label_map = {0 : "agree", 1 : "disagree", 2 : "discuss", 3 : "unrelated"}
 		simple_y_str = [label_map[label] for label in simple_y]
-		pred_y_stances_str = [label_map[label] for label in all_pred_y_stances]
+		pred_y_stances_str = [label_map[label] for label in all_pred_y_test]
 		report_score(simple_y_str, pred_y_stances_str)
 
-	# assess performance on test set
-	print('\n#### RUNNING ON HOLDOUT SET ####')
+		h, b = [], []
+		for stance in hold_out_stances:
+			h.append(stance['Headline'])
+			b.append(d.articles[stance['Body ID']])
 
-	# Test batches
-	article_batches_test,headline_batches_test,output_batches_test,length_h_batches_test,length_a_batches_test,global_batches_test = create_batches(test_x_articles, 
-	test_x_headlines, 
-	test_y, 
-	test_h_lengths, 
-	test_a_lengths, 
-	test_x_global)
+		b = [" ".join(body) for body in b]
 
-	all_pred_y_test = []
-	for i in range(len(article_batches_test)):
-		pred_y_stances = model.session.run([model.pred_stance], {
-				model.inputs_articles:  article_batches_test[i],
-				model.inputs_headlines: headline_batches_test[i],
-				model.outputs: output_batches_test[i],
-				model.h_lengths: length_h_batches_test[i],
-				model.a_lengths: length_a_batches_test[i],
-				model.global_feats: global_batches_test[i]
-			})
-		all_pred_y_test = np.append(all_pred_y_test, pred_y_stances)
+		print('### CLASSIFICATIONS ###')
+		for i in range(len(b)):
+			print('Pair ' + str(i))
+			print('\tHeadline: ' + str(h[i]))
+			print('\tBody: ' + str(b[i]))
+			print('\tTrue label: ' + str(simple_y_str[i]))
+			print('\tAssigned label: ' + str(pred_y_stances_str[i]))
 
-	simple_y = np.array([array.tolist().index(1) for array in test_y])
-	f1_score = metrics.f1_score(simple_y, all_pred_y_test, average='macro')
-	print("F1 MEAN score: " + str(f1_score))
-	f1_score_labels =  metrics.f1_score(simple_y, all_pred_y_test, labels=[0, 1, 2, 3], average=None)
-	print("F1 LABEL scores: " + str(f1_score_labels))
 
-	# Convert to string labels for FNC scoring metric
-	label_map = {0 : "agree", 1 : "disagree", 2 : "discuss", 3 : "unrelated"}
-	simple_y_str = [label_map[label] for label in simple_y]
-	pred_y_stances_str = [label_map[label] for label in all_pred_y_test]
-	report_score(simple_y_str, pred_y_stances_str)
+		saver.save(model.session,'/tmp/' + model_path) 
 
 if __name__ == '__main__':
 	main()

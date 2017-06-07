@@ -46,6 +46,11 @@ def get_tfidf(headlines, bodies):
     tfidf_b = tfidf_vec.fit_transform(bodies_str)
     return tfidf_h, tfidf_b
 
+def gen_feats(feat_fn, headlines, bodies, feature_file):
+    feats = feat_fn(headlines, bodies)
+    np.save(feature_file, feats)
+    np.load(feature_file)
+
 def gen_or_load_feats(feat_fn, headlines, bodies, feature_file):
     if not os.path.isfile(feature_file):
         feats = feat_fn(headlines, bodies)
@@ -119,7 +124,7 @@ def polarity_features(headlines, bodies):
 
     def calculate_polarity(text):
         tokens = get_tokenized_lemmas(text)
-        return sum([t in _refuting_words for t in tokens]) % 2
+        return sum([t in _refuting_words for t in tokens]) # % 2
     X = []
     for i, (headline, body) in (enumerate(zip(headlines, bodies))):
         clean_headline = clean(headline)
@@ -135,7 +140,7 @@ def discuss_features(headlines, bodies):
 
     def calculate_discuss(text):
         tokens = get_tokenized_lemmas(text)
-        return sum([t in _discuss_words for t in tokens]) % 2
+        return sum([t in _discuss_words for t in tokens]) # % 2
     X = []
     for i, (headline, body) in (enumerate(zip(headlines, bodies))):
         clean_headline = clean(headline)

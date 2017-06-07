@@ -38,13 +38,19 @@ class Classifier(object):
 		self.a_lengths = tf.placeholder(tf.int32, (None, 2))
 		self.global_feats = tf.placeholder(tf.float32, (None, 50))
 
-		# LSTM cells, TODO make these bidrectional!
+		window = 4
+
+		# LSTM cells
 		with tf.variable_scope('scope1') as scope1:  
 			# Create cell
 			self.cell_articles_fw = tf.contrib.rnn.BasicLSTMCell(RNN_HIDDEN, state_is_tuple=True)
 			self.cell_articles_fw = tf.contrib.rnn.core_rnn_cell.DropoutWrapper(self.cell_articles_fw, input_keep_prob=0.7, output_keep_prob=0.2)
+			self.cell_articles_fw = tf.contrib.rnn.AttentionCellWrapper(self.cell_articles_fw, window, state_is_tuple=True)
+
 			self.cell_articles_bw = tf.contrib.rnn.BasicLSTMCell(RNN_HIDDEN, state_is_tuple=True)
 			self.cell_articles_bw = tf.contrib.rnn.core_rnn_cell.DropoutWrapper(self.cell_articles_bw, input_keep_prob=0.7, output_keep_prob=0.2)
+			self.cell_articles_bw = tf.contrib.rnn.AttentionCellWrapper(self.cell_articles_bw, window, state_is_tuple=True)
+
 			self.rnn_outputs_articles, self.rnn_states_articles = 	tf.nn.bidirectional_dynamic_rnn(self.cell_articles_fw, self.cell_articles_bw, self.inputs_articles, dtype=tf.float32)
 			# Initialize batch size, initial states
 			'''
@@ -58,8 +64,9 @@ class Classifier(object):
 			# Create cell
 			self.cell_headlines_fw = tf.contrib.rnn.BasicLSTMCell(RNN_HIDDEN, state_is_tuple=True, reuse=True)
 			self.cell_headlines_fw = tf.contrib.rnn.core_rnn_cell.DropoutWrapper(self.cell_headlines_fw, input_keep_prob=0.7, output_keep_prob=0.2) 
+			self.cell_headlines_fw = tf.contrib.rnn.AttentionCellWrapper(self.cell_headlines_fw, window, state_is_tuple=True, reuse=True)
+
 			self.cell_headlines_bw = tf.contrib.rnn.BasicLSTMCell(RNN_HIDDEN, state_is_tuple=True, reuse=True)
-			self.cell_headlines_bw = tf.contrib.rnn.core_rnn_cell.DropoutWrapper(self.cell_headlines_bw, input_keep_prob=0.3, output_keep_prob=0.6) 
 			self.rnn_outputs_headlines, self.rnn_states_headlines = tf.nn.bidirectional_dynamic_rnn(self.cell_headlines_fw, self.cell_headlines_bw, self.inputs_headlines, dtype=tf.float32)
 			'''
 			# Initialize batch size, initial states

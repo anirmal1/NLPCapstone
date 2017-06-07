@@ -42,6 +42,7 @@ def get_tfidf(headlines, bodies):
     tfidf_h = tfidf_vec.fit_transform(headlines)
     # Transform bodies to be one string instead list of words
     bodies_str = [" ".join(body) for body in bodies]
+    print(str(bodies))
     tfidf_b = tfidf_vec.fit_transform(bodies_str)
     return tfidf_h, tfidf_b
 

@@ -10,13 +10,14 @@ from fnc_1_baseline_master.utils.generate_test_splits import kfold_split, get_st
 from fnc_1_baseline_master.feature_engineering import refuting_features, polarity_features, hand_features, gen_or_load_feats, word_overlap_features, discuss_features, get_sentiment_difference, get_tfidf
 from fnc_1_baseline_master.utils.score import report_score, LABELS, score_submission
 from fnc_1_baseline_master.utils.system import parse_params, check_version
+from sklearn import svm
 
 model_path = 'lstm_model.ckpt' # for saving the model later
 
 INPUT_SIZE = 100 # length of GLoVe word embeddings
 RNN_HIDDEN = 100
-OUTPUT_SIZE = 4
-HIDDEN_OUTPUT_SIZE = 4
+OUTPUT_SIZE = 3 # No 'unrelated' label in LSTM
+HIDDEN_OUTPUT_SIZE = 3
 TINY = 1e-6
 LEARNING_RATE = 0.0001
 BATCH_SIZE = 1024
@@ -77,7 +78,6 @@ class Classifier(object):
 		# self.rnn_outputs = tf.concat([self.rnn_outputs_articles[0], self.rnn_outputs_articles[1], self.rnn_outputs_headlines[0], self.rnn_outputs_headlines[1]], 1)
 		self.final_projection = layers.fully_connected(self.rnn_outputs, num_outputs=HIDDEN_OUTPUT_SIZE, activation_fn=tf.nn.sigmoid)
 		self.pred_stance = tf.argmax(self.final_projection, 1)
-		#self.softmaxes = tf.nn.softmax(final_projection[0:, 0:])
 
 		# cross entropy loss TODO compute cross entropy between softmax and expected output (a one-hot vector)
 		#self.error = -(self.outputs * tf.log(self.softmaxes + TINY) + (1.0 - self.outputs) * tf.log(1.0 - self.softmaxes + TINY))
@@ -87,10 +87,6 @@ class Classifier(object):
 		self.error = tf.reduce_mean(self.error)
 		self.train_fn = tf.train.AdamOptimizer(learning_rate=LEARNING_RATE, name='train_fn').minimize(self.error)
 		
-		# accuracy TODO what is this even doing...
-		#self.accuracy = tf.reduce_mean(tf.cast(tf.abs(self.outputs - final_projection) < 0.5, tf.float32))
-
-
 ################################################################################
 ##                             WORD VECTORS                                   ##
 ################################################################################
@@ -189,6 +185,7 @@ def create_batches(x_articles, x_headlines, y, lengths_h, lengths_a, global_feat
 			length_h_chunk[i][0] = i
 			length_a_chunk[i][0] = i
 		global_batches_chunk = global_feats[start:start + batch_size]
+		
 		article_batches.append(article_chunk)
 		headline_batches.append(headline_chunk)
 		output_batches.append(output_chunk)
@@ -255,15 +252,72 @@ def main():
 		length_a_valid = lengths_a[fold]		
 		global_valid = x_global[fold]
 
+		# SVM 1 : distinguishing unrelated from related
+		X_train = global_train
+		y_train_round1 = []
+		for item in y_train:
+		  # if unrelated
+		  if item[3] == 1:
+		    y_train_round1.append(0)
+		  else:
+		    y_train_round1.append(1)
+		y_train_round1 = np.array(y_train_round1)
+		print("y_train len: " + str(len(y_train)))
+
+		X_valid = global_valid
+		y_valid_round1 = []
+		for item in y_valid:
+		  if item[3] == 1:
+		    y_valid_round1.append(0)
+		  else:
+		    y_valid_round1.append(1)
+		y_valid_round1 = np.array(y_valid_round1)
+
+		clf1 = svm.SVC() 
+		# NOTE: Train on valid because it's a smaller set
+		# Want to use train set in LSTM
+		clf1.fit(X_valid, y_valid_round1)
+
+		round1_pred = clf1.predict(X_train)
+		round1_score = 0
+		for i in range(len(round1_pred)):
+		  if round1_pred[i] == y_train_round1[i]:
+		    round1_score += 1
+		round1_score = 1.0 * round1_score / len(round1_pred)
+		print('round 1 score: ' + str(round1_score))
+		
+		# Get related article IDs for y_valid_round1
+		related_ids = [i for i in y_valid_round1 if y_valid_round1[i] == 1]
+		print("related_ids len: " + str(len(related_ids)))
+
+		# REFORMAT FOR BILSTM
+		# Reformat y_train so it only has related labels (now only 3 labels)
+		y_train_round2 = []
+		for index, label in enumerate(round1_pred):
+			if label == 1:
+				y_train_round2.append(y_train[index][:-1])
+			# If unrelated, append as all 0's
+			else:
+				y_train_round2.append([0, 0, 0])
+		# Reformat y_valid so it only has related labels
+		y_valid_round2 = []
+		for label in y_valid:
+			if label[3] != 1:
+				y_valid_round2.append(label[:-1])
+			# If unrelated, append as all 0's
+			else:
+				y_valid_round2.append([0, 0, 0])
+
+		# TRAINING
 		fold_error = 0
 		print('Training fold ' + str(fold))
 		j = 0
 		for epoch in range(5):
 			
 			# Training batches
-			article_batches_train,headline_batches_train,output_batches_train,length_h_batches_train,length_a_batches_train, global_batches_train = create_batches(x_train_articles, 
+			article_batches_train,headline_batches_train,output_batches_train,length_h_batches_train,length_a_batches_train, global_batches_train= create_batches(x_train_articles, 
 			x_train_headlines, 
-			y_train, 
+			y_train_round2, 
 			lengths_h_train, 
 			lengths_a_train, 
 			global_train)
@@ -288,7 +342,7 @@ def main():
 		# Validation batches
 		article_batches_valid,headline_batches_valid,output_batches_valid,length_h_batches_valid,length_a_batches_valid, global_batches_valid = create_batches(x_valid_articles, 
 		x_valid_headlines, 
-		y_valid, 
+		y_valid_round2, 
 		length_h_valid, 
 		length_a_valid, 
 		global_valid)
@@ -306,6 +360,17 @@ def main():
 				})
 			all_pred_y_stances = np.append(all_pred_y_stances, pred_y_stances)
 		
+		# Merge related and unrelated labels together for final prediction
+		final_pred = []
+		all_pred_count = 0
+		for label in y_valid_round1:
+			# If unrelated
+			if label == 0:
+				final_pred.append(3)
+			else:
+				final_pred.append(all_pred_y_stances[all_pred_count])
+				all_pred_count += 1
+
 		simple_y = np.array([array.tolist().index(1) for array in y_valid])
 		'''
 		f1_score = metrics.f1_score(simple_y, pred_y_stances, average='macro')
@@ -316,7 +381,7 @@ def main():
 		# Convert to string labels for FNC scoring metric
 		label_map = {0 : "agree", 1 : "disagree", 2 : "discuss", 3 : "unrelated"}
 		simple_y_str = [label_map[label] for label in simple_y]
-		pred_y_stances_str = [label_map[label] for label in all_pred_y_stances]
+		pred_y_stances_str = [label_map[label] for label in final_pred]
 		report_score(simple_y_str, pred_y_stances_str)
 
 	# assess performance on test set

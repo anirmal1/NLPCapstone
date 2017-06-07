@@ -15,7 +15,7 @@ from sklearn import svm
 model_path = 'lstm_model.ckpt' # for saving the model later
 
 INPUT_SIZE = 100 # length of GLoVe word embeddings
-RNN_HIDDEN = 100
+RNN_HIDDEN = 25
 OUTPUT_SIZE = 3 # No 'unrelated' label in LSTM
 HIDDEN_OUTPUT_SIZE = 3
 TINY = 1e-6
@@ -59,7 +59,7 @@ class Classifier(object):
 			self.cell_headlines_fw = tf.contrib.rnn.BasicLSTMCell(RNN_HIDDEN, state_is_tuple=True, reuse=True)
 			self.cell_headlines_fw = tf.contrib.rnn.core_rnn_cell.DropoutWrapper(self.cell_headlines_fw, input_keep_prob=0.7, output_keep_prob=0.2) 
 			self.cell_headlines_bw = tf.contrib.rnn.BasicLSTMCell(RNN_HIDDEN, state_is_tuple=True, reuse=True)
-			self.cell_headlines_bw = tf.contrib.rnn.core_rnn_cell.DropoutWrapper(self.cell_headlines_bw, input_keep_prob=0.7, output_keep_prob=0.2) 
+			self.cell_headlines_bw = tf.contrib.rnn.core_rnn_cell.DropoutWrapper(self.cell_headlines_bw, input_keep_prob=0.3, output_keep_prob=0.6) 
 			self.rnn_outputs_headlines, self.rnn_states_headlines = tf.nn.bidirectional_dynamic_rnn(self.cell_headlines_fw, self.cell_headlines_bw, self.inputs_headlines, dtype=tf.float32)
 			'''
 			# Initialize batch size, initial states
@@ -76,7 +76,7 @@ class Classifier(object):
 
 		self.rnn_outputs = tf.concat([out1, out2, out3, out4, self.global_feats], 1)
 		# self.rnn_outputs = tf.concat([self.rnn_outputs_articles[0], self.rnn_outputs_articles[1], self.rnn_outputs_headlines[0], self.rnn_outputs_headlines[1]], 1)
-		self.final_projection = layers.fully_connected(self.rnn_outputs, num_outputs=HIDDEN_OUTPUT_SIZE, activation_fn=tf.nn.sigmoid)
+		self.final_projection = layers.fully_connected(self.rnn_outputs, num_outputs=HIDDEN_OUTPUT_SIZE, activation_fn=tf.nn.relu)
 		self.pred_stance = tf.argmax(self.final_projection, 1)
 
 		# cross entropy loss TODO compute cross entropy between softmax and expected output (a one-hot vector)

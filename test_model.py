@@ -9,74 +9,6 @@ from fnc_lstm_class import Classifier
 
 model_path = 'lstm_model.ckpt'
 
-INPUT_SIZE = 100 # length of GLoVe word embeddings
-RNN_HIDDEN = 25
-OUTPUT_SIZE = 4
-HIDDEN_OUTPUT_SIZE = 4
-TINY = 1e-6
-LEARNING_RATE = 0.001
-BATCH_SIZE = 1024
-'''
-class Classifier(object):
-	def __init__(self):
-		self.session = tf.Session()
-
-		# input/output placeholders
-		self.inputs_articles = tf.placeholder(tf.float32, (None, 200, INPUT_SIZE), name='input_articles')
-		self.inputs_headlines = tf.placeholder(tf.float32, (None, 30, INPUT_SIZE), name='inputs_headlines')	
-		self.outputs = tf.placeholder(tf.float32, (None, OUTPUT_SIZE), name='outputs') # TODO change to two dimensions
-		self.h_lengths = tf.placeholder(tf.int32, (None, 2))
-		self.a_lengths = tf.placeholder(tf.int32, (None, 2))
-		self.global_feats = tf.placeholder(tf.float32, (None, 44))
-
-		window = 4
-
-		# LSTM cells, TODO make these bidrectional!
-		with tf.variable_scope('scope1') as scope1:  
-			# Create cell
-			self.cell_articles_fw = tf.contrib.rnn.BasicLSTMCell(RNN_HIDDEN, state_is_tuple=True)
-			self.cell_articles_fw = tf.contrib.rnn.core_rnn_cell.DropoutWrapper(self.cell_articles_fw, input_keep_prob=0.7, output_keep_prob=0.2)
-			self.cell_articles_fw = tf.contrib.rnn.AttentionCellWrapper(self.cell_articles_fw, window, state_is_tuple=True)
-			self.cell_articles_bw = tf.contrib.rnn.BasicLSTMCell(RNN_HIDDEN, state_is_tuple=True)
-			self.cell_articles_bw = tf.contrib.rnn.core_rnn_cell.DropoutWrapper(self.cell_articles_bw, input_keep_prob=0.7, output_keep_prob=0.2)
-			self.cell_articles_bw = tf.contrib.rnn.AttentionCellWrapper(self.cell_articles_bw, window, state_is_tuple=True)
-			self.rnn_outputs_articles, self.rnn_states_articles = 	tf.nn.bidirectional_dynamic_rnn(self.cell_articles_fw, self.cell_articles_bw, self.inputs_articles, dtype=tf.float32)
-
-		with tf.variable_scope('scope1') as scope1:
-			scope1.reuse_variables() 
-			# Create cell
-			self.cell_headlines_fw = tf.contrib.rnn.BasicLSTMCell(RNN_HIDDEN, state_is_tuple=True, reuse=True)
-			self.cell_headlines_fw = tf.contrib.rnn.core_rnn_cell.DropoutWrapper(self.cell_headlines_fw, input_keep_prob=0.7, output_keep_prob=0.2)
-			self.cell_headlines_fw = tf.contrib.rnn.AttentionCellWrapper(self.cell_headlines_fw, window, state_is_tuple=True, reuse=True) 
-			self.cell_headlines_bw = tf.contrib.rnn.BasicLSTMCell(RNN_HIDDEN, state_is_tuple=True, reuse=True)
-			self.cell_headlines_bw = tf.contrib.rnn.core_rnn_cell.DropoutWrapper(self.cell_headlines_bw, input_keep_prob=0.7, output_keep_prob=0.2) 
-			self.cell_headlines_bw = tf.contrib.rnn.AttentionCellWrapper(self.cell_headlines_bw, window, state_is_tuple=True, reuse=True)
-			self.rnn_outputs_headlines, self.rnn_states_headlines = tf.nn.bidirectional_dynamic_rnn(self.cell_headlines_fw, self.cell_headlines_bw, self.inputs_headlines, dtype=tf.float32)
-
-		# make prediction
-		out1 = tf.gather_nd(self.rnn_outputs_articles[0], self.a_lengths)
-		out2 = tf.gather_nd(self.rnn_outputs_articles[1], self.a_lengths)
-		out3 = tf.gather_nd(self.rnn_outputs_headlines[0], self.h_lengths)
-		out4 = tf.gather_nd(self.rnn_outputs_headlines[1], self.h_lengths)
-
-		self.rnn_outputs = tf.concat([out1, out2, out3, out4, self.global_feats], 1)
-		# self.rnn_outputs = tf.concat([self.rnn_outputs_articles[0], self.rnn_outputs_articles[1], self.rnn_outputs_headlines[0], self.rnn_outputs_headlines[1]], 1)
-		self.final_projection = layers.fully_connected(self.rnn_outputs, num_outputs=HIDDEN_OUTPUT_SIZE, activation_fn=tf.nn.sigmoid)
-		self.pred_stance = tf.argmax(self.final_projection, 1)
-		#self.softmaxes = tf.nn.softmax(final_projection[0:, 0:])
-
-		# cross entropy loss TODO compute cross entropy between softmax and expected output (a one-hot vector)
-		#self.error = -(self.outputs * tf.log(self.softmaxes + TINY) + (1.0 - self.outputs) * tf.log(1.0 - self.softmaxes + TINY))
-		# self.error = -(self.outputs * tf.log(predicted_outputs + TINY) + (1.0 - self.outputs) * tf.log(1.0 - predicted_outputs + TINY))
-		#self.error = tf.reduce_mean(self.error)
-		self.error = tf.nn.softmax_cross_entropy_with_logits(labels=self.outputs, logits=self.final_projection)
-		self.error = tf.reduce_mean(self.error)
-		self.train_fn = tf.train.AdamOptimizer(learning_rate=LEARNING_RATE, name='train_fn').minimize(self.error)
-		
-		# accuracy TODO what is this even doing...
-		#self.accuracy = tf.reduce_mean(tf.cast(tf.abs(self.outputs - final_projection) < 0.5, tf.float32))
-'''
-
 def get_articles_word_vectors(h_, b_, t, word_embeddings):
 	y = []
 	h = []
@@ -124,36 +56,35 @@ def generate_features(h, b):
 	X_polarity = gen_or_load_feats(polarity_features, h, b, "fnc_1_baseline_master/features/polarity."+name+".npy")
 	X_hand = gen_or_load_feats(hand_features, h, b, "fnc_1_baseline_master/features/hand."+name+".npy")
 	X_discuss = gen_or_load_feats(discuss_features, h, b, "fnc_1_baseline_master/features/discuss."+name+".npy")
-	# X_vader_sentiment = gen_feats(get_sentiment_difference, h, b, "fnc_1_baseline_master/features/vader_sentiment."+name+".npy")
-	#X_tfidf_headline, X_tfidf_bodies = gen_feats(get_tfidf, h, b, "fnc_1_baseline_master/features/tfidf."+name+".npy")
-	X = np.c_[X_hand, X_polarity, X_refuting, X_overlap]
+	X_vader_sentiment = gen_or_load_feats(get_sentiment_difference, h, b, "fnc_1_baseline_master/features/vader_sentiment."+name+".npy")
+	#X_tfidf_headline, X_tfidf_bodies = gen_or_load_feats(get_tfidf, h, b, "fnc_1_baseline_master/features/tfidf."+name+".npy")
+	
+	# Pad X_vader_sentiment, X_tfidf_h, X_tfidf_b to fit feature matrix X
+	vader_padding = np.zeros((len(h)-len(X_vader_sentiment), X_vader_sentiment.shape[1]))
+	X_vader_sentiment = np.append(X_vader_sentiment, vader_padding, axis = 0)
+	
+	X = np.c_[X_vader_sentiment, X_discuss, X_hand, X_polarity, X_refuting, X_overlap]
 	print(X)
 	return X
-
-
-
 
 
 
 def main():
 	print('Starting test model...')
 
-	with tf.Graph().as_default() as g:
+	model = Classifier()
+
+	with model.graph.as_default():
 		#session = tf.Session()
-		with tf.Session() as session:
-			# saver = tf.train.Saver(tf.all_variables())
-			model = Classifier()
+		with model.session as session:
+			saver = tf.train.Saver(tf.all_variables())
 			# model.session.run(tf.global_variables_initializer())
-			saver = tf.train.import_meta_graph(model_path + '.meta')
-			saver.restore(model.session, save_path='/tmp/' + model_path)
+			# saver = tf.train.import_meta_graph(model_path + '.meta')
+			saver.restore(session, save_path='/tmp/' + model_path)
 			# model.session.run(tf.global_variables_initializer())
 			print('Model restored.')
 
-			# print([v.op.name for v in tf.all_variables()])
-		
-			# print(model.session.run())
 	
-			# TODO complete this portion (feed in our own data, command line interface)
 			embeddings = WordEmbeddings()
 			
 			while True:
@@ -164,10 +95,10 @@ def main():
 				h, a, t, l_h, l_a = get_articles_word_vectors(headline, article, true_label, embeddings)
 				g_f = generate_features(headline, article)
 
-				pred_stances = model.session.run([model.pred_stance, model.train_fn], {
-					model.inputs_articles: a,  # INSERT EMBEDDING
-					model.inputs_headlines: h, # INSERT EMBEDDING
-					model.outputs: t, # INSERT EMBEDDING
+				pred_stances = session.run([model.pred_stance, model.train_fn], {
+					model.inputs_articles: a,
+					model.inputs_headlines: h,
+					model.outputs: t, 
 					model.h_lengths: l_h,
 					model.a_lengths: l_a,
 					model.global_feats: g_f

@@ -10,8 +10,9 @@ from fnc_1_baseline_master.utils.generate_test_splits import kfold_split, get_st
 from fnc_1_baseline_master.feature_engineering import refuting_features, polarity_features, hand_features, gen_or_load_feats, word_overlap_features, discuss_features, get_sentiment_difference, get_tfidf
 from fnc_1_baseline_master.utils.score import report_score, LABELS, score_submission
 from fnc_1_baseline_master.utils.system import parse_params, check_version
+import sys
 
-model_path = 'lstm_model.ckpt' # for saving the model later
+model_path = sys.argv[1] #'lstm_model.ckpt' # for saving the model later
 
 INPUT_SIZE = 100 # length of GLoVe word embeddings
 RNN_HIDDEN = 25
@@ -293,19 +294,7 @@ def main():
 			fold_error = 0
 			print('Training fold ' + str(fold))
 			j = 0
-			for epoch in range(5):
-				
-				'''
-				# Training batches
-				article_batches_train,headline_batches_train,output_batches_train,length_h_batches_train,length_a_batches_train, global_batches_train = create_batches(x_train_articles, 
-				x_train_headlines, 
-				y_train, 
-				lengths_h_train, 
-				lengths_a_train, 
-				global_train)
-				'''
-
-				print(len(article_batches_train))
+			for epoch in range(1):
 
 				for i in range(len(article_batches_train)):
 					# Training error
@@ -323,12 +312,14 @@ def main():
 					j += 1
 
 			print('Training error (fold) = ' + str(fold_error / j) + '\n')
+
+			'''
 			print('LSTM Cell Weights')
 			print('\tFW articles ' + str(model.rnn_states_articles[0]))	
 			print('\tBW articles ' + str(model.rnn_states_articles[1]))
 			print('\tFW headlines ' + str(model.rnn_states_headlines[0]))
 			print('\tBW headlines ' + str(model.rnn_states_headlines[1]))
-			
+			'''
 			# Validation batches
 			article_batches_valid,headline_batches_valid,output_batches_valid,length_h_batches_valid,length_a_batches_valid, global_batches_valid = create_batches(x_valid_articles, 
 			x_valid_headlines, 
@@ -405,13 +396,15 @@ def main():
 
 		b = [" ".join(body) for body in b]
 
-		print('### CLASSIFICATIONS ###')
-		for i in range(len(b)):
-			print('Pair ' + str(i))
-			print('\tHeadline: ' + str(h[i]))
-			print('\tBody: ' + str(b[i]))
-			print('\tTrue label: ' + str(simple_y_str[i]))
-			print('\tAssigned label: ' + str(pred_y_stances_str[i]))
+		filename = sys.argv[2]
+		with open(filename, 'w') as f:
+			print('### CLASSIFICATIONS ###')
+			for i in range(len(b)):
+				f.write('Pair ' + str(i) + '\n')
+				f.write('\tHeadline: ' + str(h[i]) + '\n')
+				f.write('\tBody: ' + str(b[i]) + '\n')
+				f.write('\tTrue label: ' + str(simple_y_str[i]) + '\n')
+				f.write('\tAssigned label: ' + str(pred_y_stances_str[i]) + '\n')
 
 
 		saver.save(model.session,'/tmp/' + model_path) 

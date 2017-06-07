@@ -3,7 +3,7 @@ import numpy as np
 
 from sklearn.ensemble import GradientBoostingClassifier
 from sklearn.ensemble import AdaBoostClassifier
-from sklearn import svm
+from sklearn import svm, metrics
 from fnc_1_baseline_master.feature_engineering import reg_counts, discuss_features, refuting_features, polarity_features, hand_features, gen_or_load_feats
 from fnc_1_baseline_master.feature_engineering import word_overlap_features, LIWC_lexicons, gen_or_load_feats_liwc, get_sentiment_difference
 from fnc_1_baseline_master.utils.dataset_svm import DataSet
@@ -28,6 +28,8 @@ def generate_features(stances,dataset,name):
     X_hand = gen_or_load_feats(hand_features, h, b, "fnc_1_baseline_master/features/hand."+name+".npy")
     X_discuss = gen_or_load_feats(discuss_features, h, b, "fnc_1_baseline_master/features/discuss."+name+".npy")
     X_vader_sentiment = gen_or_load_feats(get_sentiment_difference, h, b, "fnc_1_baseline_master/features/vader_sentiment."+name+".npy")
+    vader_padding = np.zeros((len(stances)-len(X_vader_sentiment), X_vader_sentiment.shape[1]))
+    X_vader_sentiment = np.append(X_vader_sentiment, vader_padding, axis = 0)
     # X_pronoun = gen_or_load_feats_liwc(reg_counts, liwc_lex['pronoun'], h, b, "fnc_1_baseline_master/features/pronoun_reg."+name+".npy")
     # X_anx = gen_or_load_feats_liwc(reg_counts, liwc_lex['anx'], h, b, "fnc_1_baseline_master/features/anx_reg."+name+".npy")
     # X_anger = gen_or_load_feats_liwc(reg_counts, liwc_lex['anger'], h, b,  "fnc_1_baseline_master/features/anger_reg."+name+".npy") 
@@ -159,4 +161,9 @@ if __name__ == "__main__":
     predicted = [LABELS[int(a)] for a in predicted]
     actual = [LABELS[int(a)] for a in y_holdout]
 
+    f1_score = metrics.f1_score(actual, predicted, average='macro')
+    print("F1 MEAN score: " + str(f1_score))
+    f1_score_labels =  metrics.f1_score(predicted, actual, labels=["agree", "disagree", "discuss", "unrelated"], average=None)
+    print("F1 LABEL scores: " + str(f1_score_labels))
+    
     report_score(actual,predicted)

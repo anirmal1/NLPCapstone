@@ -4,9 +4,10 @@ import tensorflow as tf
 import tensorflow.contrib.layers as layers
 from word_embeddings import WordEmbeddings
 from sklearn import metrics
+from scipy.sparse import vstack, hstack
 from fnc_1_baseline_master.utils.dataset import DataSet
 from fnc_1_baseline_master.utils.generate_test_splits import kfold_split, get_stances_for_folds
-from fnc_1_baseline_master.feature_engineering import refuting_features, polarity_features, hand_features, gen_or_load_feats, word_overlap_features, discuss_features, get_sentiment_difference
+from fnc_1_baseline_master.feature_engineering import refuting_features, polarity_features, hand_features, gen_or_load_feats, word_overlap_features, discuss_features, get_sentiment_difference, get_tfidf
 from fnc_1_baseline_master.utils.score import report_score, LABELS, score_submission
 from fnc_1_baseline_master.utils.system import parse_params, check_version
 
@@ -36,7 +37,7 @@ class Classifier(object):
 			self.outputs = tf.placeholder(tf.float32, (None, OUTPUT_SIZE), name='outputs') # TODO change to two dimensions
 			self.h_lengths = tf.placeholder(tf.int32, (None, 2))
 			self.a_lengths = tf.placeholder(tf.int32, (None, 2))
-			self.global_feats = tf.placeholder(tf.float32, (None, 44))
+			self.global_feats = tf.placeholder(tf.float32, (None, 50))
 
 			window = 4
 
@@ -105,6 +106,7 @@ class Classifier(object):
 			#self.accuracy = tf.reduce_mean(tf.cast(tf.abs(self.outputs - final_projection) < 0.5, tf.float32))
 
 
+
 ################################################################################
 ##                             WORD VECTORS                                   ##
 ################################################################################
@@ -160,16 +162,23 @@ def generate_features(stances,dataset,name):
     X_discuss = gen_or_load_feats(discuss_features, h, b, "fnc_1_baseline_master/features/discuss."+name+".npy")
     X_vader_sentiment = gen_or_load_feats(get_sentiment_difference, h, b, "fnc_1_baseline_master/features/vader_sentiment."+name+".npy")
     #X_tfidf_headline, X_tfidf_bodies = gen_or_load_feats(get_tfidf, h, b, "fnc_1_baseline_master/features/tfidf."+name+".npy")
-    #print(X_hand.shape)
-    #print(X_discuss.shape)
-    #print(X_vader_sentiment.shape)
-    #print(X_tfidf_headline.shape)
-    #print(X_tfidf_bodies.shape)
+    
+    # Pad X_vader_sentiment, X_tfidf_h, X_tfidf_b to fit feature matrix X
+    vader_padding = np.zeros((len(stances)-len(X_vader_sentiment), X_vader_sentiment.shape[1]))
+    X_vader_sentiment = np.append(X_vader_sentiment, vader_padding, axis = 0)
+    #tfidf_h_padding = np.zeros((len(stances)-X_tfidf_headline.shape[0], X_tfidf_headline.shape[1]))
+    #X_tfidf_headline = vstack((X_tfidf_headline, tfidf_h_padding))
+    #tfidf_b_padding = np.zeros((len(stances)-X_tfidf_bodies.shape[0], X_tfidf_bodies.shape[1]))
+    #X_tfidf_bodies = vstack((X_tfidf_bodies, tfidf_b_padding))
+    
+    #print("X_discuss: " + str(X_discuss.shape))
+    #print("X_vader: " + str(X_vader_sentiment.shape))
+    #print("X_tfidf_h: " + str(X_tfidf_headline.shape))
+    #print("X_tfidf_b: " + str(X_tfidf_bodies.shape))
 
-    X = np.c_[X_hand, X_polarity, X_refuting, X_overlap]
-    #print(X.shape)
-    #X = X.reshape(len(y), 44, 1)
-    #y = np.asarray(y).reshape(len(y), 1, 1)
+    #X = np.c_[X_tfidf_headline.todense(), X_tfidf_bodies.todense(), X_vader_sentiment, X_discuss, X_hand, X_polarity, X_refuting, X_overlap] 
+    X = np.c_[X_vader_sentiment, X_discuss, X_hand, X_polarity, X_refuting, X_overlap]
+    #print("X: " + str(X.shape))
 
     return X,y
  
@@ -273,8 +282,7 @@ def main():
 			length_h_valid = lengths_h[fold]
 			length_a_valid = lengths_a[fold]		
 			global_valid = x_global[fold]
-
-			# Training batches
+		# Training batches
 			article_batches_train,headline_batches_train,output_batches_train,length_h_batches_train,length_a_batches_train, global_batches_train = create_batches(x_train_articles, 
 				x_train_headlines, 
 				y_train, 

@@ -36,7 +36,7 @@ class Classifier(object):
 		self.outputs = tf.placeholder(tf.float32, (None, OUTPUT_SIZE), name='outputs') # TODO change to two dimensions
 		self.h_lengths = tf.placeholder(tf.int32, (None, 2))
 		self.a_lengths = tf.placeholder(tf.int32, (None, 2))
-		self.global_feats = tf.placeholder(tf.float32, (None, 50))
+		self.global_feats = tf.placeholder(tf.float32, (None, 46))
 
 		window = 4
 
@@ -147,24 +147,26 @@ def generate_features(stances,dataset,name):
     X_polarity = gen_or_load_feats(polarity_features, h, b, "fnc_1_baseline_master/features/polarity."+name+".npy")
     X_hand = gen_or_load_feats(hand_features, h, b, "fnc_1_baseline_master/features/hand."+name+".npy")
     X_discuss = gen_or_load_feats(discuss_features, h, b, "fnc_1_baseline_master/features/discuss."+name+".npy")
-    X_vader_sentiment = gen_or_load_feats(get_sentiment_difference, h, b, "fnc_1_baseline_master/features/vader_sentiment."+name+".npy")
+    #X_vader_sentiment = gen_or_load_feats(get_sentiment_difference, h, b, "fnc_1_baseline_master/features/vader_sentiment."+name+".npy")
     #X_tfidf_headline, X_tfidf_bodies = gen_or_load_feats(get_tfidf, h, b, "fnc_1_baseline_master/features/tfidf."+name+".npy")
     
     # Pad X_vader_sentiment, X_tfidf_h, X_tfidf_b to fit feature matrix X
-    vader_padding = np.zeros((len(stances)-len(X_vader_sentiment), X_vader_sentiment.shape[1]))
-    X_vader_sentiment = np.append(X_vader_sentiment, vader_padding, axis = 0)
+    #vader_padding = np.zeros((len(stances)-len(X_vader_sentiment), X_vader_sentiment.shape[1]))
+    #X_vader_sentiment = np.append(X_vader_sentiment, vader_padding, axis = 0)
     #tfidf_h_padding = np.zeros((len(stances)-X_tfidf_headline.shape[0], X_tfidf_headline.shape[1]))
     #X_tfidf_headline = vstack((X_tfidf_headline, tfidf_h_padding))
     #tfidf_b_padding = np.zeros((len(stances)-X_tfidf_bodies.shape[0], X_tfidf_bodies.shape[1]))
     #X_tfidf_bodies = vstack((X_tfidf_bodies, tfidf_b_padding))
     
+    #print("X_hand: " + str(X_hand.shape))
     #print("X_discuss: " + str(X_discuss.shape))
     #print("X_vader: " + str(X_vader_sentiment.shape))
     #print("X_tfidf_h: " + str(X_tfidf_headline.shape))
     #print("X_tfidf_b: " + str(X_tfidf_bodies.shape))
 
     #X = np.c_[X_tfidf_headline.todense(), X_tfidf_bodies.todense(), X_vader_sentiment, X_discuss, X_hand, X_polarity, X_refuting, X_overlap] 
-    X = np.c_[X_vader_sentiment, X_discuss, X_hand, X_polarity, X_refuting, X_overlap]
+    #X = np.c_[X_vader_sentiment, X_discuss, X_hand, X_polarity, X_refuting, X_overlap]
+    X = np.c_[X_discuss, X_hand, X_polarity, X_refuting, X_overlap]
     #print("X: " + str(X.shape))
 
     return X,y
@@ -234,9 +236,14 @@ def main():
 
 	test_x_headlines, test_x_articles, test_y, test_h_lengths, test_a_lengths = get_articles_word_vectors(hold_out_stances, d, embeddings)
 	test_x_global, test_y_global = generate_features(hold_out_stances, d, 'holdout')
+	print("hold_out_stances: " + str(len(hold_out_stances)))
+	print("test_x_global: " + str(len(test_x_global)))
+	print("test_y_global: " + str(len(test_y_global)))
 	
 	test_x_headlines_small, test_x_articles_small, test_y_small, test_h_lengths_small, test_a_lengths_small = get_articles_word_vectors(hold_out_stances_small, d, embeddings)
-	test_x_global_small, test_y_global_small = generate_features(hold_out_stances_small, d, 'holdout')
+	test_x_global_small, test_y_global_small = generate_features(hold_out_stances_small, d, 'holdout_small')
+	print("test_x_global_small: " + str(len(test_x_global_small)))
+	print("test_y_global_small: " + str(len(test_y_global_small)))
 	print('Finished separating folds')
 	
 	# train LSTM (fold -> epoch -> batch)
@@ -286,6 +293,7 @@ def main():
 		# NOTE: Train on valid because it's a smaller set
 		# Want to use train set in LSTM
 		clf1.fit(X_valid, y_valid_round1)
+		print("X_valid, y_valid_round1 shape: " + str(X_valid.shape) + ", " + str(y_valid_round1.shape))
 
 		round1_pred = clf1.predict(X_train)
 		round1_score = 0
@@ -318,7 +326,7 @@ def main():
 		print('Training fold ' + str(fold))
 		j = 0
 		#NOTE: Change epoch back to 5!!
-		for epoch in range(1):
+		for epoch in range(5):
 			
 			# Training batches
 			article_batches_train,headline_batches_train,output_batches_train,length_h_batches_train,length_a_batches_train, global_batches_train= create_batches(x_train_articles, 
@@ -414,9 +422,9 @@ def main():
 	clf2 = svm.SVC() 
 	# NOTE: Train on valid because it's a smaller set
 	# Want to use train set in LSTM
-	clf2.fit(test_x_articles_small, y_test_small_round1)
+	clf2.fit(test_x_global_small, test_y_global_small)
 
-	round1_pred = clf2.predict(test_x_articles)
+	round1_pred = clf2.predict(test_x_global)
 	round1_score = 0
 	for i in range(len(round1_pred)):
 	  if round1_pred[i] == y_test_round1[i]:
@@ -428,7 +436,7 @@ def main():
 	y_test_round2 = []
 	for index, label in enumerate(round1_pred):
 		if label == 1:
-			y_test_round2.append(test_y[index][:-1])
+			y_test_round2.append(test_y_global[index][:-1])
 		# If unrelated, append as all 0's
 		else:
 			y_test_round2.append([0, 0, 0])

@@ -62,14 +62,12 @@ def get_stances_for_folds(dataset,folds,hold_out):
 
 def get_stances_for_folds2(dataset,folds,hold_out):
     stances_folds = defaultdict(list)
+    stances_hold_out_temp = []
     stances_hold_out = []
     stances_hold_out_small = []
     for index, stance in enumerate(dataset.stances):
         if stance['Body ID'] in hold_out:
-            if index < len(dataset.stances)/10:
-                stances_hold_out_small.append(stance)
-            else:
-                stances_hold_out.append(stance)
+            stances_hold_out_temp.append(stance)
         else:
             fold_id = 0
             for fold in folds:
@@ -77,4 +75,9 @@ def get_stances_for_folds2(dataset,folds,hold_out):
                     stances_folds[fold_id].append(stance)
                 fold_id += 1
 
+    for index, stance in enumerate(stances_hold_out_temp):
+        if index < len(stances_hold_out_temp)//10:
+            stances_hold_out_small.append(stance)
+        else:
+            stances_hold_out.append(stance)
     return stances_folds,stances_hold_out,stances_hold_out_small
